@@ -4,23 +4,35 @@ Conformal Retirement Portfolio Simulator
 
 1. Overview
 
-The goal is to build a robust interactive Streamlit web application for retirement planning that avoids the pitfalls of parametric (Normal Distribution) assumptions. Instead of assuming a theoretical distribution, the tool uses Conformal Prediction via Residual Sampling—drawing directly from historical market errors (residuals) to model future volatility. This ensures that "Fat Tail" events (e.g., 1929, 2000, 2008) are natively represented in the risk model.
+The goal is to build a robust interactive Streamlit web application for retirement planning that avoids the pitfalls of simplistic parametric assumptions while offering advanced modeling capabilities. The tool provides two distinct simulation engines:
+
+Non-Parametric: Conformal Prediction via Residual Sampling (Fat Tail aware).
+
+Parametric: Autoregressive (AR) Mean Reversion (Cycle/Momentum aware).
 
 The application specifically models a "Smart Hedged" Withdrawal Strategy, where the retiree maintains a cash buffer to avoid selling equities during market downturns, mitigating Sequence of Returns Risk.
 
 2. Core Methodology
 
-Simulation Method: Non-Parametric Monte Carlo.
+The simulator must support two user-selectable modes:
 
-Prediction Engine: Conformal Prediction using Historical Residuals.
+Mode A: Historical Residuals (Conformal)
 
-Predictor: Long-term historical mean of S&P 500 returns.
+Concept: Assumes the market is random but follows the shape of historical errors (Fat Tails).
 
-Calibration Set: Historical annual return residuals ($Actual - Mean$) calculated from a configurable look-back window (e.g., last 60 years).
+Logic: $Return_{t} = \mu + \text{RandomSample}(Residuals)$
 
-Simulation: Future Year Return = $Mean + Randomly Sampled Residual$.
+Calibration: Calculates residuals ($Return_i - Mean$) from a configurable historical window (e.g., last 60 years).
 
-Inflation: Constant rate applied annually to purchasing power and withdrawal targets.
+Mode B: Autoregressive (AR) Mean Reversion
+
+Concept: Assumes the market has "memory." High returns are often followed by mean reversion, and crashes often exhibit momentum or drag.
+
+Logic: AR(p) process. $Return_{t} = \text{Intercept} + \sum_{i=1}^{p} (\phi_i \cdot Return_{t-i}) + \epsilon$
+
+Calibration: Uses statsmodels to fit an ARIMA(p,0,0) model to historical S&P 500 annual returns.
+
+State Tracking: The simulation must track a rolling history window of $p$ years for every simulation path to correctly model the autocorrelation structure.
 
 3. Asset Allocation & Strategy Logic
 
@@ -28,37 +40,29 @@ Inflation: Constant rate applied annually to purchasing power and withdrawal tar
 
 Total Net Worth: Split into two buckets at $T=0$:
 
-Cash Buffer: Funded immediately to cover $N$ years of annual spending (e.g., 2 years).
+Cash Buffer: Funded immediately to cover $N$ years of annual spending.
 
-Equity Portfolio: The remainder of the net worth is invested in the market (S&P 500).
+Equity Portfolio: The remainder is invested in the market (S&P 500).
 
 3.2. "Smart Hedged" Withdrawal Rules
 
-For every year $t$ in the simulation:
+For every year $t$:
 
 Calculate Needs: Determine inflation-adjusted target spending.
 
-Safety Cap: Calculate maximum allowable withdrawal as 4% of Total Remaining Assets (Equity + Cash).
+Solvency Check: Calculate Total Liquid Assets (Equity + Cash).
 
-Actual Withdrawal = min(Target Spend, Safety Cap).
+Desired Withdrawal: min(Target Spend, Total Liquid Assets). (Prioritizes lifestyle maintenance unless completely broke).
 
-Sourcing Funds (The Decision Logic):
+Sourcing Funds:
 
-Scenario A: Panic Market (Market Return < PANIC_THRESHOLD):
+Panic Market ($Return < \text{Threshold}$): Withdraw from Cash Buffer first. If empty, sell Equity.
 
-Withdraw funds from Cash Buffer first.
-
-If Cash Buffer is empty, withdraw remainder from Equity.
-
-Scenario B: Normal Market (Market Return ≥ PANIC_THRESHOLD):
-
-Withdraw funds from Equity first.
-
-If Equity is empty, withdraw remainder from Cash Buffer.
+Normal Market ($Return \ge \text{Threshold}$): Withdraw from Equity first. If empty, use Cash.
 
 4. Configuration Parameters (UI Inputs)
 
-The app must provide a sidebar or input form allowing users to adjust parameters dynamically:
+The app must provide a sidebar allowing users to adjust parameters dynamically:
 
 Parameter
 
@@ -66,79 +70,89 @@ UI Element
 
 Description
 
-Example
+Financials
+
+
+
+
 
 INITIAL_NET_WORTH
 
 Number Input
 
-Total starting assets ($)
-
-$5,000,000
+Total starting assets ($).
 
 ANNUAL_SPEND
 
 Number Input
 
-Target annual spending in Year 0 dollars
+Target annual spending in Year 0 dollars.
 
-$200,000
+Strategy
+
+
+
+
 
 BUFFER_YEARS
 
-Slider/Input
-
-Size of cash bucket in years of expenses
-
-2
-
-YEARS
-
 Slider
 
-Duration of simulation
-
-30
+Size of cash bucket in years of expenses (e.g., 2).
 
 PANIC_THRESHOLD
 
 Slider
 
-Market drop % that triggers cash usage
+Market drop % that triggers cash usage (e.g., -15%).
 
--0.15 (-15%)
+Simulation Mode
 
-INFLATION_RATE
+Radio Select
 
-Slider
+"Historical Residuals" vs "Autoregressive (AR)".
 
-Annual inflation assumption
-
-0.03 (3%)
-
-N_PATHS
-
-Select/Input
-
-Number of Monte Carlo iterations
-
-5,000
-
-CONFIDENCE
+AR_ORDER
 
 Slider
 
-Statistical guarantee level
-
-0.90 (90%)
+(AR Mode Only) Number of lags ($p$) to use (1-5).
 
 HISTORY_YEARS
 
 Slider
 
-Look-back window for calibration data
+Look-back window for calibration data (e.g., 60).
 
-60
+Settings
+
+
+
+
+
+YEARS
+
+Slider
+
+Duration of simulation (e.g., 30).
+
+INFLATION_RATE
+
+Slider
+
+Annual inflation assumption.
+
+N_PATHS
+
+Select
+
+Number of Monte Carlo iterations (e.g., 2500).
+
+CONFIDENCE
+
+Slider
+
+Statistical guarantee level (e.g., 90%).
 
 5. Data Requirements
 
@@ -146,60 +160,48 @@ Source: Yahoo Finance API (yfinance).
 
 Ticker: ^GSPC (S&P 500 Index).
 
-Frequency: Annual Returns.
+Frequency: Annual Returns (resampled from Daily/Monthly).
 
 Processing:
 
-Fetch historical close prices.
+Fetch historical data based on HISTORY_YEARS.
 
-Resample to annual percentage change.
+For Residuals Mode: Calculate simple mean and residuals.
 
-Calculate residuals ($Return_i - Mean$).
+For AR Mode: Fit ARIMA model to extract coefficients ($\phi$), intercept, and volatility ($\sigma$).
 
-Caching: Data fetching should be cached via Streamlit (@st.cache_data) to prevent redundant API calls.
+Caching: Critical for performance; cache data fetching and model fitting.
 
 6. Visualization & Reporting
 
-The tool must generate two synchronized interactive time-series plots.
+The tool must generate two synchronized interactive Plotly charts:
 
 Plot A: Portfolio Value (The "Survival" Chart)
 
-Fan Chart: Display the confidence interval (e.g., 5th to 95th percentile) as a shaded region.
+Fan Chart: 5th–95th percentile shaded area.
 
-Median Line: The most probable outcome.
+Lines: Median Portfolio Value and 5th Percentile (Risk Boundary).
 
-Risk Boundary: A distinct line highlighting the lower bound (e.g., 5th percentile).
+Tooltips: Show exact dollar values on hover.
 
-Interactivity: Mouseover tooltips showing the exact Portfolio Value ($) for any specific year on the median and risk lines.
-
-Ruin Visualization:
-
-Clearly mark the $0 line.
-
-Annotate the Year of Ruin (if applicable) where the Risk Boundary hits $0.
+Ruin Marker: If the Risk Boundary hits $0, visually indicate the year of ruin.
 
 Plot B: Withdrawal Capacity (The "Lifestyle" Chart)
 
-Target Line: A horizontal line showing the Desired Annual Spend (Real $).
+Target Line: Horizontal line showing Desired Real Spending.
 
-Capacity Curves: Plot the Median and 5th Percentile withdrawal amounts over time.
+Actual Spending: Plot Median and Risk (5th %ile) capacity.
 
-Lifestyle Gap: Use shading (e.g., red) to highlight years where the 5th Percentile Capacity < Target Spend. This visually represents the risk of being "solvents but poor".
-
-Interactivity: Tooltips showing the Real Withdrawal Amount ($) vs Target for specific years.
+Gap Analysis: Visually demonstrate when the portfolio cannot support the target lifestyle (Real Withdrawal < Target).
 
 7. Software Stack
 
 Language: Python 3.x
 
-Libraries:
+UI Framework: streamlit
 
-streamlit: Web application framework and UI.
+Data Analysis: numpy (vectorized simulation), pandas, statsmodels (ARIMA calibration).
 
-yfinance: Data fetching.
+Data Feed: yfinance
 
-numpy: Matrix operations and vectorised simulation.
-
-plotly: Interactive plotting (replacing static matplotlib charts) for tooltips and zooming.
-
-pandas: Time series handling.
+Visualization: plotly.graph_objects

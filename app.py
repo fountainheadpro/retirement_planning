@@ -5,7 +5,7 @@ import streamlit as st
 import plotly.graph_objects as go
 import numpy as np
 
-from simulator import get_sp500_residuals, run_simulation, calculate_statistics
+from simulator import get_sp500_residuals, run_simulation, calculate_statistics, create_ar_model
 
 st.set_page_config(
     page_title="Retirement Portfolio Simulator",
@@ -15,19 +15,47 @@ st.set_page_config(
 
 st.title("📈 Conformal Retirement Portfolio Simulator")
 st.markdown("""
-This tool uses **Conformal Prediction via Residual Sampling** to model future market volatility,
-ensuring fat-tail events (1929, 2000, 2008) are represented in risk projections.
+This tool uses **Conformal Prediction via Residual Sampling** or **Mean Reversion via Ornstein-Uhlenbeck** to model future market behavior,
+ensuring fat-tail events (2000, 2008) are represented in risk projections.
 """)
 
 # Sidebar Configuration
 st.sidebar.header("⚙️ Configuration")
+
+st.sidebar.subheader("Simulation Mode")
+use_mean_reversion = st.sidebar.checkbox(
+    "Use Mean Reversion Model",
+    value=True,
+    help="Use Ornstein-Uhlenbeck process instead of historical residuals"
+)
+
+# Mean reversion model parameters
+if use_mean_reversion:
+    mr_lookback_window = st.sidebar.slider(
+        "Mean Reversion Lookback (Months)",
+        min_value=12,
+        max_value=240,
+        value=120,
+        step=12,
+        help="Number of recent months to use for model calibration"
+    )
+
+    ar_order = st.sidebar.selectbox(
+        "Autoregressive Order",
+        options=[1, 2, 3, 4, 5],
+        index=0,
+        help="Number of years to use in autoregression (AR order)"
+    )
+else:
+    mr_lookback_window = None
+    ar_order = 1
 
 st.sidebar.subheader("Portfolio Settings")
 initial_net_worth = st.sidebar.number_input(
     "Initial Net Worth ($)",
     min_value=100_000,
     max_value=50_000_000,
-    value=5_000_000,
+    value=6_000_000,
     step=100_000,
     format="%d"
 )
@@ -36,7 +64,7 @@ annual_spend = st.sidebar.number_input(
     "Annual Spending ($)",
     min_value=10_000,
     max_value=1_000_000,
-    value=200_000,
+    value=250_000,
     step=10_000,
     format="%d"
 )
@@ -48,6 +76,15 @@ buffer_years = st.sidebar.slider(
     value=2,
     help="Years of expenses to keep in cash buffer"
 )
+
+spending_cap_pct = st.sidebar.slider(
+    "Spending Cap (% of Portfolio)",
+    min_value=1.0,
+    max_value=10.0,
+    value=4.0,
+    step=0.5,
+    help="Maximum annual withdrawal as percentage of total portfolio value"
+) / 100
 
 st.sidebar.subheader("Simulation Settings")
 years = st.sidebar.slider(
@@ -90,7 +127,7 @@ history_years = st.sidebar.slider(
     "Historical Data (Years)",
     min_value=20,
     max_value=100,
-    value=60,
+    value=50,
     help="Look-back window for calibration"
 )
 
@@ -107,15 +144,28 @@ def fetch_market_data(history_years: int):
 if run_button or 'results' not in st.session_state:
     with st.spinner("Fetching market data..."):
         try:
-            mu, residuals, annual_returns = fetch_market_data(history_years)
+            if use_mean_reversion:
+                mu, residuals = 0.0, np.array([])
+                ar_model = None
+                stats_msg = ""
+                
+                mean_reversion_model, stats_msg = create_ar_model(history_years=history_years, ar_order=ar_order)
+            else:
+                mu, residuals, annual_returns = fetch_market_data(history_years)
+                mean_reversion_model = None
         except Exception as e:
             st.error(f"Error fetching data: {e}")
             st.stop()
-    
+
     # Display calibration info
-    st.sidebar.success(f"Mean Return: {mu:.2%}")
-    st.sidebar.info(f"Samples: {len(residuals)} years")
-    
+    if use_mean_reversion:
+        st.sidebar.success(f"Mean Reversion Model Calibrated")
+        st.sidebar.info(f"AR Order: {ar_order}")
+        st.sidebar.info(f"History: {mr_lookback_window} months")
+    else:
+        st.sidebar.success(f"Mean Return: {mu:.2%}")
+        st.sidebar.info(f"Samples: {len(residuals)} years")
+
     with st.spinner(f"Running {n_paths:,} simulations..."):
         portfolio_vals, withdrawal_vals = run_simulation(
             initial_net_worth=initial_net_worth,
@@ -126,7 +176,10 @@ if run_button or 'results' not in st.session_state:
             inflation_rate=inflation_rate,
             n_paths=n_paths,
             mu=mu,
-            residuals=residuals
+            residuals=residuals,
+            use_ar_model=use_mean_reversion,
+            ar_model=mean_reversion_model,
+            spending_cap_pct=spending_cap_pct
         )
     
     stats = calculate_statistics(portfolio_vals, withdrawal_vals, confidence)

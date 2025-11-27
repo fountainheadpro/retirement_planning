@@ -4,7 +4,7 @@ Tests for the retirement portfolio simulator.
 import numpy as np
 import pytest
 
-from simulator import run_simulation, calculate_statistics, _source_funds
+from simulator import run_simulation, calculate_statistics, _source_funds, MeanRevertingMarket, create_ar_model
 
 
 class TestSourceFunds:
@@ -98,7 +98,7 @@ class TestRunSimulation:
             n_paths=100,
             mu=0.08,
             residuals=mock_residuals,
-            seed=42
+            use_ar_model=False
         )
         
         assert portfolio.shape == (11, 100)  # years+1 x n_paths
@@ -116,13 +116,15 @@ class TestRunSimulation:
             n_paths=10,
             mu=0.08,
             residuals=mock_residuals,
-            seed=42
+            use_ar_model=False
         )
         
         assert np.all(portfolio[0, :] == 1_000_000)
     
     def test_reproducibility_with_seed(self, mock_residuals):
         """Same seed should produce same results."""
+        # Set numpy seed for reproducibility
+        np.random.seed(123)
         result1, _ = run_simulation(
             initial_net_worth=1_000_000,
             annual_spend=40_000,
@@ -133,9 +135,10 @@ class TestRunSimulation:
             n_paths=50,
             mu=0.08,
             residuals=mock_residuals,
-            seed=123
+            use_ar_model=False
         )
-        
+
+        np.random.seed(123)
         result2, _ = run_simulation(
             initial_net_worth=1_000_000,
             annual_spend=40_000,
@@ -146,9 +149,9 @@ class TestRunSimulation:
             n_paths=50,
             mu=0.08,
             residuals=mock_residuals,
-            seed=123
+            use_ar_model=False
         )
-        
+
         np.testing.assert_array_equal(result1, result2)
     
     def test_high_spend_causes_depletion(self, mock_residuals):
@@ -165,9 +168,8 @@ class TestRunSimulation:
             n_paths=100,
             mu=0.0,  # No positive mean return
             residuals=bad_residuals,
-            seed=42
+            use_ar_model=False
         )
-        
         # Some paths should hit zero or near-zero
         final_values = portfolio[-1, :]
         # With consistently negative returns and high spending, portfolio should decline
@@ -185,9 +187,8 @@ class TestRunSimulation:
             n_paths=100,
             mu=0.08,
             residuals=mock_residuals,
-            seed=42
+            use_ar_model=False
         )
-        
         # Median should stay positive
         median_final = np.median(portfolio[-1, :])
         assert median_final > 0
@@ -205,7 +206,7 @@ class TestRunSimulation:
             n_paths=1,
             mu=0.0,
             residuals=residuals,
-            seed=1,
+            use_ar_model=False
         )
 
         # Equity should be clamped to zero and withdrawals limited to available assets
@@ -225,9 +226,8 @@ class TestRunSimulation:
             n_paths=1,
             mu=0.0,  # No market return
             residuals=np.array([0.0]),  # Zero residual
-            seed=42
+            use_ar_model=False
         )
-        
         # With 0% return and 0 inflation, after withdrawal of 50k
         # from 900k equity (since 100k is cash), we should have ~850k equity + some cash
         # Year 0: 1M, Year 1: ~950k (after 50k withdrawal from equity)
@@ -282,11 +282,182 @@ class TestEdgeCases:
             n_paths=10,
             mu=0.08,
             residuals=residuals,
-            seed=42
+            use_ar_model=False
         )
-        
         assert portfolio.shape == (6, 10)
         assert np.all(portfolio[0, :] == 1_000_000)
+
+
+class TestMeanRevertingMarket:
+    """Test the MeanRevertingMarket class for AR modeling."""
+
+    def test_initialization(self):
+        """Test basic initialization."""
+        model = MeanRevertingMarket()
+        assert model.ar_order == 1
+        assert model.ar_coeffs is None
+        assert model.intercept is None
+        assert model.residual_std is None
+        assert len(model.history_window) == 1
+
+    def test_calibration(self):
+        """Test model calibration with synthetic data."""
+        model = MeanRevertingMarket(ar_order=1)
+
+        # Create synthetic AR(1) data
+        np.random.seed(42)
+        n_points = 50  # 50 years of annual data
+
+        # True AR(1) parameters: y_t = 0.08 + 0.3 * y_{t-1} + noise
+        true_intercept = 0.08
+        true_ar_coeff = 0.3
+        true_std = 0.02
+
+        # Generate synthetic AR(1) process
+        data = [0.08]  # Start with long-term mean
+        for _ in range(n_points - 1):
+            noise = np.random.normal(0, true_std)
+            next_val = true_intercept + true_ar_coeff * data[-1] + noise
+            data.append(next_val)
+
+        # Calibrate model
+        model.calibrate_from_history(data)
+
+        # Check that parameters are set
+        assert model.intercept is not None
+        assert model.ar_coeffs is not None
+        assert model.residual_std is not None
+
+        # Parameters should be reasonable
+        assert isinstance(model.intercept, (int, float))
+        assert len(model.ar_coeffs) == 1
+        assert model.residual_std > 0
+
+    def test_simulation_requires_calibration(self):
+        """Test that simulation fails without calibration."""
+        model = MeanRevertingMarket()
+
+        with pytest.raises(ValueError, match="Model not calibrated"):
+            model.simulate_year(np.array([0.04]), 1)
+
+    def test_simulation_output_shape(self):
+        """Test simulation output dimensions."""
+        model = MeanRevertingMarket(ar_order=1)
+
+        # Calibrate with synthetic data
+        data = np.random.normal(0.08, 0.02, 30)
+        model.calibrate_from_history(data)
+
+        # Simulate - returns 1D array of returns for n_paths simulations
+        returns = model.simulate_year(np.array([0.08]), 5)
+
+        # Check shape: (simulations,)
+        assert returns.shape == (5,)
+
+    def test_simulation_positive_growth(self):
+        """Test that simulated returns are reasonable."""
+        model = MeanRevertingMarket(ar_order=1)
+
+        # Calibrate with synthetic data
+        data = np.random.normal(0.08, 0.02, 30)
+        model.calibrate_from_history(data)
+
+        # Simulate
+        returns = model.simulate_year(np.array([0.08]), 10)
+
+        # Returns should be finite numbers
+        assert np.all(np.isfinite(returns))
+        assert len(returns) == 10
+
+
+class TestARSimulation:
+    """Test simulation with AR model enabled."""
+
+    @pytest.fixture
+    def calibrated_ar_model(self):
+        """Create a calibrated AR model."""
+        model = MeanRevertingMarket(ar_order=1)
+        yields = np.random.normal(0.04, 0.01, 120)
+        model.calibrate_from_history(yields)
+        return model
+
+    def test_ar_simulation_shape(self, calibrated_ar_model):
+        """Test that AR simulation produces correct output shape."""
+        portfolio, withdrawals = run_simulation(
+            initial_net_worth=1_000_000,
+            annual_spend=40_000,
+            buffer_years=2,
+            years=5,
+            panic_threshold=-0.15,
+            inflation_rate=0.03,
+            n_paths=10,
+            mu=0.08,  # Not used in AR mode
+            residuals=np.array([0.0]),  # Not used in AR mode
+            use_ar_model=True,
+            ar_model=calibrated_ar_model
+        )
+
+        assert portfolio.shape == (6, 10)  # years+1 x n_paths
+        assert withdrawals.shape == (5, 10)  # years x n_paths
+
+    def test_ar_initial_value(self, calibrated_ar_model):
+        """Test that initial portfolio value is correct in AR mode."""
+        portfolio, _ = run_simulation(
+            initial_net_worth=1_000_000,
+            annual_spend=40_000,
+            buffer_years=2,
+            years=5,
+            panic_threshold=-0.15,
+            inflation_rate=0.03,
+            n_paths=10,
+            mu=0.08,
+            residuals=np.array([0.0]),
+            use_ar_model=True,
+            ar_model=calibrated_ar_model
+        )
+
+        assert np.all(portfolio[0, :] == 1_000_000)
+
+    def test_ar_vs_historical_mode(self, calibrated_ar_model):
+        """Test that AR and historical modes produce different results."""
+        # Set seed for reproducibility
+        np.random.seed(42)
+
+        # Run historical mode
+        portfolio_hist, _ = run_simulation(
+            initial_net_worth=1_000_000,
+            annual_spend=40_000,
+            buffer_years=2,
+            years=5,
+            panic_threshold=-0.15,
+            inflation_rate=0.0,  # No inflation for cleaner comparison
+            n_paths=100,
+            mu=0.08,
+            residuals=np.array([-0.1, 0.0, 0.1]),
+            use_ar_model=False
+        )
+
+        # Set seed again for fair comparison
+        np.random.seed(42)
+
+        # Run AR mode
+        portfolio_ar, _ = run_simulation(
+            initial_net_worth=1_000_000,
+            annual_spend=40_000,
+            buffer_years=2,
+            years=5,
+            panic_threshold=-0.15,
+            inflation_rate=0.0,
+            n_paths=100,
+            mu=0.08,
+            residuals=np.array([-0.1, 0.0, 0.1]),
+            use_ar_model=True,
+            ar_model=calibrated_ar_model
+        )
+
+        # Results should be different (though this is probabilistic)
+        # We check that at least one path differs
+        assert not np.allclose(portfolio_hist, portfolio_ar)
     
     def test_zero_inflation(self):
         """Should work with no inflation."""
@@ -301,9 +472,8 @@ class TestEdgeCases:
             n_paths=10,
             mu=0.08,
             residuals=residuals,
-            seed=42
+            use_ar_model=False
         )
-        
         # With 0% inflation, real withdrawals should be constant
         # (if not capped by 4% rule)
         assert withdrawals.shape == (5, 10)
@@ -321,8 +491,7 @@ class TestEdgeCases:
             n_paths=1,
             mu=0.08,
             residuals=residuals,
-            seed=42
+            use_ar_model=False
         )
-        
         assert portfolio.shape == (11, 1)
         assert withdrawals.shape == (10, 1)
