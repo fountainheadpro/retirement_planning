@@ -228,24 +228,29 @@ if 'results' in st.session_state:
         annotation_position="top right"
     )
     
-    # Lifestyle gap shading (where lower < target)
-    lower_vals = stats['withdrawal']['lower']
-    gap_x = []
-    gap_y = []
-    for i, (yr, val) in enumerate(zip(years_withdraw, lower_vals)):
-        if val < params['annual_spend']:
-            gap_x.extend([yr, yr])
-            gap_y.extend([0, val])
-    
-    if gap_x:
+    # Lifestyle gap shading (where lower < target): fill area between target and lower percentile
+    lower_vals = np.array(stats['withdrawal']['lower'])
+    target_line = np.where(lower_vals < params['annual_spend'], params['annual_spend'], None)
+    gap_floor = np.where(lower_vals < params['annual_spend'], lower_vals, None)
+
+    if np.any(lower_vals < params['annual_spend']):
         fig2.add_trace(go.Scatter(
             x=years_withdraw,
-            y=[min(v, params['annual_spend']) for v in lower_vals],
-            fill='tozeroy',
-            fillcolor='rgba(255, 0, 0, 0.1)',
-            line=dict(color='rgba(255,255,255,0)'),
-            name='Lifestyle Gap Risk',
+            y=target_line,
+            mode='lines',
+            line=dict(color='rgba(0,0,0,0)'),
+            showlegend=False,
             hoverinfo='skip'
+        ))
+        fig2.add_trace(go.Scatter(
+            x=years_withdraw,
+            y=gap_floor,
+            fill='tonexty',
+            fillcolor='rgba(255, 0, 0, 0.15)',
+            line=dict(color='rgba(255,0,0,0.4)', dash='dot'),
+            name='Lifestyle Gap Risk',
+            hovertemplate='Year %{x}<br>Gap: $%{customdata:,.0f}<extra></extra>',
+            customdata=np.maximum(0, params['annual_spend'] - lower_vals)
         ))
     
     # Median withdrawal

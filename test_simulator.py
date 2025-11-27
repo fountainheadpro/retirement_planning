@@ -65,6 +65,17 @@ class TestSourceFunds:
         )
         assert result == 50_000  # 30k equity + 20k cash
 
+    def test_negative_equity_does_not_inflate_withdrawal(self):
+        """Negative equity should not count toward available funds."""
+        result = _source_funds(
+            desired=100_000,
+            market_return=0.05,
+            panic_threshold=-0.15,
+            equity=-50_000,
+            cash=20_000,
+        )
+        assert result == 20_000
+
 
 class TestRunSimulation:
     """Test the Monte Carlo simulation."""
@@ -180,6 +191,26 @@ class TestRunSimulation:
         # Median should stay positive
         median_final = np.median(portfolio[-1, :])
         assert median_final > 0
+
+    def test_negative_equity_does_not_create_funds(self):
+        """Withdrawal sourcing should not increase equity when returns go below -100%."""
+        residuals = np.array([-2.0])  # Forces equity wipeout
+        portfolio, withdrawals = run_simulation(
+            initial_net_worth=100_000,
+            annual_spend=50_000,
+            buffer_years=0,
+            years=1,
+            panic_threshold=-0.15,
+            inflation_rate=0.0,
+            n_paths=1,
+            mu=0.0,
+            residuals=residuals,
+            seed=1,
+        )
+
+        # Equity should be clamped to zero and withdrawals limited to available assets
+        assert portfolio[-1, 0] == 0
+        assert withdrawals[0, 0] == 0
     
     def test_buffer_allocation(self, mock_residuals):
         """Cash buffer should be properly allocated."""
