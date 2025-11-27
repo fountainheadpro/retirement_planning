@@ -85,52 +85,41 @@ def run_simulation(
         current_equity = initial_equity
         current_cash = initial_cash
         inflation_index = 1.0
-        
+
         for t in range(1, years + 1):
             # Market movement (Conformal Prediction)
             sampled_residual = np.random.choice(residuals)
             market_return = mu + sampled_residual
-            
-            # Update equity with market return
-            current_equity = current_equity * (1 + market_return)
-            
+
+            # Update equity with market return and disallow negative balances
+            current_equity = max(0.0, current_equity * (1 + market_return))
+
             # Determine needs
             inflation_index *= (1 + inflation_rate)
             target_spend_nominal = annual_spend * inflation_index
-            
+
             # Safety cap: 4% of total remaining assets
             total_assets = max(0, current_equity) + current_cash
             safety_cap = 0.04 * total_assets
             desired_withdrawal = min(target_spend_nominal, safety_cap)
-            
+
             # Source funds based on market conditions
-            actual_withdrawal_nominal = _source_funds(
-                desired_withdrawal, 
-                market_return, 
+            (
+                actual_withdrawal_nominal,
+                from_cash,
+                from_equity,
+            ) = _allocate_withdrawal(
+                desired_withdrawal,
+                market_return,
                 panic_threshold,
-                current_equity, 
-                current_cash
+                current_equity,
+                current_cash,
             )
-            
-            # Update balances
-            if market_return < panic_threshold and current_cash > 0:
-                from_cash = min(desired_withdrawal, current_cash)
-                current_cash -= from_cash
-                remainder = desired_withdrawal - from_cash
-                if current_equity > 0:
-                    from_equity = min(remainder, current_equity)
-                    current_equity -= from_equity
-            else:
-                if current_equity > 0:
-                    from_equity = min(desired_withdrawal, current_equity)
-                    current_equity -= from_equity
-                    remainder = desired_withdrawal - from_equity
-                    from_cash = min(remainder, current_cash)
-                    current_cash -= from_cash
-                else:
-                    from_cash = min(desired_withdrawal, current_cash)
-                    current_cash -= from_cash
-            
+
+            # Update balances with the allocated amounts
+            current_cash -= from_cash
+            current_equity -= from_equity
+
             # Store results
             total_portfolio_values[t, path] = max(0, current_equity) + current_cash
             withdrawals_real[t - 1, path] = actual_withdrawal_nominal / inflation_index
@@ -139,28 +128,48 @@ def run_simulation(
 
 
 def _source_funds(
-    desired: float, 
-    market_return: float, 
+    desired: float,
+    market_return: float,
     panic_threshold: float,
-    equity: float, 
+    equity: float,
     cash: float
 ) -> float:
     """Calculate actual withdrawal amount based on strategy."""
-    if market_return < panic_threshold and cash > 0:
-        # Bad market: use cash first
-        from_cash = min(desired, cash)
-        remainder = desired - from_cash
-        from_equity = min(remainder, max(0, equity)) if equity > 0 else 0
-        return from_cash + from_equity
+    allocation = _allocate_withdrawal(
+        desired,
+        market_return,
+        panic_threshold,
+        equity,
+        cash,
+    )
+    return allocation[0]
+
+
+def _allocate_withdrawal(
+    desired: float,
+    market_return: float,
+    panic_threshold: float,
+    equity: float,
+    cash: float,
+) -> tuple[float, float, float]:
+    """Allocate withdrawals between cash and equity without overdrawing.
+
+    Returns a tuple of (total_withdrawal, from_cash, from_equity).
+    """
+    available_equity = max(0.0, equity)
+    available_cash = max(0.0, cash)
+    available_total = available_equity + available_cash
+
+    actual_withdrawal = min(desired, available_total)
+
+    if market_return < panic_threshold and available_cash > 0:
+        from_cash = min(actual_withdrawal, available_cash)
+        from_equity = min(actual_withdrawal - from_cash, available_equity)
     else:
-        # Normal market: use equity first
-        if equity > 0:
-            from_equity = min(desired, equity)
-            remainder = desired - from_equity
-            from_cash = min(remainder, cash)
-            return from_equity + from_cash
-        else:
-            return min(desired, cash)
+        from_equity = min(actual_withdrawal, available_equity)
+        from_cash = min(actual_withdrawal - from_equity, available_cash)
+
+    return actual_withdrawal, from_cash, from_equity
 
 
 def calculate_statistics(
