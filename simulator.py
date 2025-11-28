@@ -265,8 +265,11 @@ def run_simulation(
         
         # Identify paths that are: 
         # 1. Not in panic (mask2)
-        # 2. Have less cash than target
-        replenish_mask = mask2 & (current_cash < target_cash_level)
+        # 2. Market is positive (Nominal > 0) - Don't sell equity to fill cash in a down market
+        # 3. Have less cash than target
+        
+        positive_market_mask = market_return_nominal > 0
+        replenish_mask = mask2 & positive_market_mask & (current_cash < target_cash_level)
         
         if np.any(replenish_mask):
             # Calculate shortfall
