@@ -88,7 +88,7 @@ class TestRunSimulation:
     
     def test_simulation_shape(self, mock_residuals):
         """Output arrays should have correct dimensions."""
-        portfolio, withdrawals, _, _ = run_simulation(
+        results = run_simulation(
             initial_net_worth=1_000_000,
             annual_spend=40_000,
             buffer_years=2,
@@ -100,13 +100,15 @@ class TestRunSimulation:
             residuals=mock_residuals,
             use_ar_model=False
         )
+        portfolio = results['portfolio_values']
+        withdrawals = results['withdrawal_values']
         
         assert portfolio.shape == (11, 100)  # years+1 x n_paths
         assert withdrawals.shape == (10, 100)  # years x n_paths
     
     def test_initial_value_correct(self, mock_residuals):
         """Year 0 should equal initial net worth."""
-        portfolio, _, _, _ = run_simulation(
+        results = run_simulation(
             initial_net_worth=1_000_000,
             annual_spend=40_000,
             buffer_years=2,
@@ -118,6 +120,7 @@ class TestRunSimulation:
             residuals=mock_residuals,
             use_ar_model=False
         )
+        portfolio = results['portfolio_values']
         
         assert np.all(portfolio[0, :] == 1_000_000)
     
@@ -125,7 +128,7 @@ class TestRunSimulation:
         """Same seed should produce same results."""
         # Set numpy seed for reproducibility
         np.random.seed(123)
-        result1, _, _, _ = run_simulation(
+        results1 = run_simulation(
             initial_net_worth=1_000_000,
             annual_spend=40_000,
             buffer_years=2,
@@ -137,9 +140,10 @@ class TestRunSimulation:
             residuals=mock_residuals,
             use_ar_model=False
         )
+        portfolio1 = results1['portfolio_values']
 
         np.random.seed(123)
-        result2, _, _, _ = run_simulation(
+        results2 = run_simulation(
             initial_net_worth=1_000_000,
             annual_spend=40_000,
             buffer_years=2,
@@ -151,14 +155,15 @@ class TestRunSimulation:
             residuals=mock_residuals,
             use_ar_model=False
         )
+        portfolio2 = results2['portfolio_values']
 
-        np.testing.assert_array_equal(result1, result2)
+        np.testing.assert_array_equal(portfolio1, portfolio2)
     
     def test_high_spend_causes_depletion(self, mock_residuals):
         """Excessive spending should deplete portfolio."""
         # Use negative residuals to ensure depletion
         bad_residuals = np.array([-0.20, -0.15, -0.10])
-        portfolio, _, _, _ = run_simulation(
+        results = run_simulation(
             initial_net_worth=500_000,
             annual_spend=100_000,  # 20% withdrawal rate
             buffer_years=0,
@@ -170,6 +175,7 @@ class TestRunSimulation:
             residuals=bad_residuals,
             use_ar_model=False
         )
+        portfolio = results['portfolio_values']
         # Some paths should hit zero or near-zero
         final_values = portfolio[-1, :]
         # With consistently negative returns and high spending, portfolio should decline
@@ -177,7 +183,7 @@ class TestRunSimulation:
     
     def test_low_spend_preserves_wealth(self, mock_residuals):
         """Conservative spending should preserve portfolio."""
-        portfolio, _, _, _ = run_simulation(
+        results = run_simulation(
             initial_net_worth=5_000_000,
             annual_spend=100_000,  # 2% withdrawal rate
             buffer_years=2,
@@ -189,6 +195,7 @@ class TestRunSimulation:
             residuals=mock_residuals,
             use_ar_model=False
         )
+        portfolio = results['portfolio_values']
         # Median should stay positive
         median_final = np.median(portfolio[-1, :])
         assert median_final > 0
@@ -196,7 +203,7 @@ class TestRunSimulation:
     def test_negative_equity_does_not_create_funds(self):
         """Withdrawal sourcing should not increase equity when returns go below -100%."""
         residuals = np.array([-2.0])  # Forces equity wipeout
-        portfolio, withdrawals, _, _ = run_simulation(
+        results = run_simulation(
             initial_net_worth=100_000,
             annual_spend=50_000,
             buffer_years=0,
@@ -208,6 +215,8 @@ class TestRunSimulation:
             residuals=residuals,
             use_ar_model=False
         )
+        portfolio = results['portfolio_values']
+        withdrawals = results['withdrawal_values']
 
         # Equity should be clamped to zero and withdrawals limited to available assets
         assert portfolio[-1, 0] == 0
@@ -216,7 +225,7 @@ class TestRunSimulation:
     def test_buffer_allocation(self, mock_residuals):
         """Cash buffer should be properly allocated."""
         # With 2 years buffer at 50k/year = 100k cash
-        portfolio, _, _, _ = run_simulation(
+        results = run_simulation(
             initial_net_worth=1_000_000,
             annual_spend=50_000,
             buffer_years=2,  # 100k in cash
@@ -228,6 +237,7 @@ class TestRunSimulation:
             residuals=np.array([0.0]),  # Zero residual
             use_ar_model=False
         )
+        portfolio = results['portfolio_values']
         # With 0% return and 0 inflation, after withdrawal of 50k
         # from 900k equity (since 100k is cash), we should have ~850k equity + some cash
         # Year 0: 1M, Year 1: ~950k (after 50k withdrawal from equity)
@@ -272,7 +282,7 @@ class TestEdgeCases:
     def test_zero_buffer_years(self):
         """Should work with no cash buffer."""
         residuals = np.array([0.0, 0.05, -0.05])
-        portfolio, _, _, _ = run_simulation(
+        results = run_simulation(
             initial_net_worth=1_000_000,
             annual_spend=40_000,
             buffer_years=0,
@@ -284,6 +294,7 @@ class TestEdgeCases:
             residuals=residuals,
             use_ar_model=False
         )
+        portfolio = results['portfolio_values']
         assert portfolio.shape == (6, 10)
         assert np.all(portfolio[0, :] == 1_000_000)
 
@@ -383,7 +394,7 @@ class TestARSimulation:
 
     def test_ar_simulation_shape(self, calibrated_ar_model):
         """Test that AR simulation produces correct output shape."""
-        portfolio, withdrawals, _, _ = run_simulation(
+        results = run_simulation(
             initial_net_worth=1_000_000,
             annual_spend=40_000,
             buffer_years=2,
@@ -396,13 +407,15 @@ class TestARSimulation:
             use_ar_model=True,
             ar_model=calibrated_ar_model
         )
+        portfolio = results['portfolio_values']
+        withdrawals = results['withdrawal_values']
 
         assert portfolio.shape == (6, 10)  # years+1 x n_paths
         assert withdrawals.shape == (5, 10)  # years x n_paths
 
     def test_ar_initial_value(self, calibrated_ar_model):
         """Test that initial portfolio value is correct in AR mode."""
-        portfolio, _, _, _ = run_simulation(
+        results = run_simulation(
             initial_net_worth=1_000_000,
             annual_spend=40_000,
             buffer_years=2,
@@ -415,6 +428,7 @@ class TestARSimulation:
             use_ar_model=True,
             ar_model=calibrated_ar_model
         )
+        portfolio = results['portfolio_values']
 
         assert np.all(portfolio[0, :] == 1_000_000)
 
@@ -424,7 +438,7 @@ class TestARSimulation:
         np.random.seed(42)
 
         # Run historical mode
-        portfolio_hist, _, _, _ = run_simulation(
+        results_hist = run_simulation(
             initial_net_worth=1_000_000,
             annual_spend=40_000,
             buffer_years=2,
@@ -436,12 +450,13 @@ class TestARSimulation:
             residuals=np.array([-0.1, 0.0, 0.1]),
             use_ar_model=False
         )
+        portfolio_hist = results_hist['portfolio_values']
 
         # Set seed again for fair comparison
         np.random.seed(42)
 
         # Run AR mode
-        portfolio_ar, _, _, _ = run_simulation(
+        results_ar = run_simulation(
             initial_net_worth=1_000_000,
             annual_spend=40_000,
             buffer_years=2,
@@ -454,6 +469,7 @@ class TestARSimulation:
             use_ar_model=True,
             ar_model=calibrated_ar_model
         )
+        portfolio_ar = results_ar['portfolio_values']
 
         # Results should be different (though this is probabilistic)
         # We check that at least one path differs
@@ -462,7 +478,7 @@ class TestARSimulation:
     def test_zero_inflation(self):
         """Should work with no inflation."""
         residuals = np.array([0.0])
-        portfolio, withdrawals, _, _ = run_simulation(
+        results = run_simulation(
             initial_net_worth=1_000_000,
             annual_spend=40_000,
             buffer_years=2,
@@ -474,6 +490,7 @@ class TestARSimulation:
             residuals=residuals,
             use_ar_model=False
         )
+        withdrawals = results['withdrawal_values']
         # With 0% inflation, real withdrawals should be constant
         # (if not capped by 4% rule)
         assert withdrawals.shape == (5, 10)
@@ -481,7 +498,7 @@ class TestARSimulation:
     def test_single_path(self):
         """Should work with just one simulation path."""
         residuals = np.array([0.05, -0.05, 0.0])
-        portfolio, withdrawals, _, _ = run_simulation(
+        results = run_simulation(
             initial_net_worth=1_000_000,
             annual_spend=40_000,
             buffer_years=2,
@@ -493,5 +510,8 @@ class TestARSimulation:
             residuals=residuals,
             use_ar_model=False
         )
+        portfolio = results['portfolio_values']
+        withdrawals = results['withdrawal_values']
+        
         assert portfolio.shape == (11, 1)
         assert withdrawals.shape == (10, 1)
