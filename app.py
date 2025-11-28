@@ -7,6 +7,12 @@ import numpy as np
 
 from simulator import get_sp500_residuals, run_simulation, calculate_statistics, create_ar_model
 
+def ordinal(n):
+    """Return number with ordinal suffix (1st, 2nd, 3rd, 4th)."""
+    n = int(n)
+    suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(4 if 10 <= n % 100 < 20 else n % 10, "th")
+    return f"{n}{suffix}"
+
 st.set_page_config(
     page_title="Retirement Portfolio Simulator",
     page_icon="📈",
@@ -23,107 +29,109 @@ ensuring fat-tail events (2000, 2008) are represented in risk projections.
 # Sidebar Configuration
 st.sidebar.header("⚙️ Configuration")
 
-# Run Simulation Button (Moved to Top)
-run_button = st.sidebar.button("🚀 Run Simulation", type="primary", use_container_width=True)
+with st.sidebar.form("config_form"):
+    
+    with st.expander("Model Configuration", expanded=True):
+        use_mean_reversion = st.checkbox(
+            "Use Mean Reversion Model",
+            value=True,
+            help="Use Ornstein-Uhlenbeck process instead of historical residuals"
+        )
 
-st.sidebar.subheader("Simulation Mode")
-use_mean_reversion = st.sidebar.checkbox(
-    "Use Mean Reversion Model",
-    value=True,
-    help="Use Ornstein-Uhlenbeck process instead of historical residuals"
-)
+        # Mean reversion model parameters
+        if use_mean_reversion:
+            ar_order = st.selectbox(
+                "Autoregressive Order",
+                options=[1, 2, 3, 4, 5],
+                index=0,
+                help="Number of years to use in autoregression (AR order)"
+            )
+        else:
+            ar_order = 1
+            
+        history_years = st.slider(
+            "Historical Data (Years)",
+            min_value=20,
+            max_value=100,
+            value=50,
+            help="Look-back window for calibration"
+        )
 
-# Mean reversion model parameters
-if use_mean_reversion:
-    ar_order = st.sidebar.selectbox(
-        "Autoregressive Order",
-        options=[1, 2, 3, 4, 5],
-        index=0,
-        help="Number of years to use in autoregression (AR order)"
-    )
-else:
-    ar_order = 1
+    with st.expander("Portfolio Settings", expanded=True):
+        initial_net_worth = st.number_input(
+            "Initial Net Worth ($)",
+            min_value=100_000,
+            max_value=50_000_000,
+            value=6_000_000,
+            step=100_000,
+            format="%d"
+        )
 
-st.sidebar.subheader("Portfolio Settings")
-initial_net_worth = st.sidebar.number_input(
-    "Initial Net Worth ($)",
-    min_value=100_000,
-    max_value=50_000_000,
-    value=6_000_000,
-    step=100_000,
-    format="%d"
-)
+        annual_spend = st.number_input(
+            "Annual Spending ($)",
+            min_value=10_000,
+            max_value=1_000_000,
+            value=250_000,
+            step=10_000,
+            format="%d"
+        )
 
-annual_spend = st.sidebar.number_input(
-    "Annual Spending ($)",
-    min_value=10_000,
-    max_value=1_000_000,
-    value=250_000,
-    step=10_000,
-    format="%d"
-)
+        buffer_years = st.slider(
+            "Cash Buffer (Years)",
+            min_value=0,
+            max_value=5,
+            value=2,
+            help="Years of expenses to keep in cash buffer"
+        )
 
-buffer_years = st.sidebar.slider(
-    "Cash Buffer (Years)",
-    min_value=0,
-    max_value=5,
-    value=2,
-    help="Years of expenses to keep in cash buffer"
-)
+        spending_cap_pct = st.slider(
+            "Spending Cap (% of Portfolio)",
+            min_value=1.0,
+            max_value=10.0,
+            value=4.0,
+            step=0.5,
+            help="Maximum annual withdrawal as percentage of total portfolio value"
+        ) / 100
 
-spending_cap_pct = st.sidebar.slider(
-    "Spending Cap (% of Portfolio)",
-    min_value=1.0,
-    max_value=10.0,
-    value=4.0,
-    step=0.5,
-    help="Maximum annual withdrawal as percentage of total portfolio value"
-) / 100
+    with st.expander("Simulation Settings", expanded=True):
+        years = st.slider(
+            "Simulation Duration (Years)",
+            min_value=10,
+            max_value=50,
+            value=30
+        )
 
-st.sidebar.subheader("Simulation Settings")
-years = st.sidebar.slider(
-    "Simulation Duration (Years)",
-    min_value=10,
-    max_value=50,
-    value=30
-)
+        panic_threshold = st.slider(
+            "Panic Threshold (%)",
+            min_value=-50,
+            max_value=0,
+            value=-15,
+            help="Market drop that triggers cash usage"
+        ) / 100
 
-panic_threshold = st.sidebar.slider(
-    "Panic Threshold (%)",
-    min_value=-50,
-    max_value=0,
-    value=-15,
-    help="Market drop that triggers cash usage"
-) / 100
+        inflation_rate = st.slider(
+            "Inflation Rate (%)",
+            min_value=0.0,
+            max_value=10.0,
+            value=3.0,
+            step=0.5
+        ) / 100
 
-inflation_rate = st.sidebar.slider(
-    "Inflation Rate (%)",
-    min_value=0.0,
-    max_value=10.0,
-    value=3.0,
-    step=0.5
-) / 100
+        n_paths = st.select_slider(
+            "Monte Carlo Paths",
+            options=[500, 1000, 2000, 5000, 10000],
+            value=5000
+        )
 
-n_paths = st.sidebar.select_slider(
-    "Monte Carlo Paths",
-    options=[500, 1000, 2000, 5000, 10000],
-    value=5000
-)
+        confidence = st.slider(
+            "Confidence Level (%)",
+            min_value=80,
+            max_value=99,
+            value=90
+        ) / 100
 
-confidence = st.sidebar.slider(
-    "Confidence Level (%)",
-    min_value=80,
-    max_value=99,
-    value=90
-) / 100
-
-history_years = st.sidebar.slider(
-    "Historical Data (Years)",
-    min_value=20,
-    max_value=100,
-    value=50,
-    help="Look-back window for calibration"
-)
+    # Submit Button within the form
+    submitted = st.form_submit_button("🚀 Run Simulation", type="primary")
 
 
 # Cache data fetching
@@ -133,7 +141,7 @@ def fetch_market_data(history_years: int):
     return get_sp500_residuals(history_years)
 
 
-if run_button or 'results' not in st.session_state:
+if submitted or 'results' not in st.session_state:
     with st.spinner("Fetching market data..."):
         try:
             if use_mean_reversion:
@@ -202,6 +210,45 @@ if 'results' in st.session_state:
     years_range = list(range(params['years'] + 1))
     years_withdraw = list(range(1, params['years'] + 1))
     
+    # Summary Statistics (Moved to Top)
+    st.subheader("📋 Summary")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    final_median = stats['portfolio']['median'][-1]
+    final_lower = stats['portfolio']['lower'][-1]
+    
+    with col1:
+        st.metric(
+            "Final Portfolio (Median)",
+            f"${final_median:,.0f}",
+            delta=f"{(final_median/params['initial_net_worth']-1)*100:.1f}%",
+            help="Expected portfolio value in the median scenario."
+        )
+    
+    with col2:
+        st.metric(
+            "Final Portfolio (Risk)",
+            f"${max(0, final_lower):,.0f}",
+            delta=f"{(final_lower/params['initial_net_worth']-1)*100:.1f}%" if final_lower > 0 else "Depleted",
+            help=f"Portfolio value in the {ordinal((1-params['confidence'])/2*100)} percentile (bad outcome) scenario."
+        )
+    
+    with col3:
+        ruin_prob = np.mean(results['portfolio_vals'][-1, :] <= 0) * 100
+        st.metric(
+            "Ruin Probability", 
+            f"{ruin_prob:.1f}%",
+            help="Probability of running out of money before the end of the simulation."
+        )
+    
+    with col4:
+        withdrawal_shortfall = np.mean(results['withdrawal_vals'] < params['annual_spend']) * 100
+        st.metric(
+            "Withdrawal Shortfall Risk", 
+            f"{withdrawal_shortfall:.1f}%",
+            help="Probability of having to reduce spending below your target."
+        )
+    
     # Portfolio Value Chart
     st.subheader("📊 Portfolio Value Projection (Real Dollars)")
     
@@ -229,11 +276,12 @@ if 'results' in st.session_state:
     ))
     
     # Risk boundary (lower percentile)
+    risk_percentile_val = int((1-params["confidence"])/2*100)
     fig1.add_trace(go.Scatter(
         x=years_range,
         y=stats['portfolio']['lower'],
         mode='lines',
-        name=f'{int((1-params["confidence"])/2*100)}th Percentile (Risk)',
+        name=f'{ordinal(risk_percentile_val)} Percentile (Risk)',
         line=dict(color='red', width=2, dash='dash'),
         hovertemplate='Year %{x}<br>$%{y:,.0f}<extra>Risk Boundary</extra>'
     ))
@@ -315,11 +363,12 @@ if 'results' in st.session_state:
     ))
     
     # Lower percentile withdrawal
+    risk_percentile_val = int((1-params["confidence"])/2*100)
     fig2.add_trace(go.Scatter(
         x=years_withdraw,
         y=stats['withdrawal']['lower'],
         mode='lines',
-        name=f'{int((1-params["confidence"])/2*100)}th Percentile',
+        name=f'{ordinal(risk_percentile_val)} Percentile',
         line=dict(color='red', width=2, dash='dash'),
         hovertemplate='Year %{x}<br>$%{y:,.0f}<extra>Risk Scenario</extra>'
     ))
@@ -339,8 +388,9 @@ if 'results' in st.session_state:
     # Asset Allocation Chart
     st.subheader("📊 Asset Allocation (Risk Scenario) - Real Dollars")
     
-    # Define alpha for the title (was previously defined later)
+    # Define alpha for the title
     alpha = (1 - params['confidence']) / 2
+    risk_percentile_val = int(alpha * 100)
     
     # Improved Risk Path Selection: Nearest Neighbor to the Risk Boundary Curve
     # 1. Get the calculated risk boundary (lower percentile curve)
@@ -380,7 +430,7 @@ if 'results' in st.session_state:
     ))
     
     fig3.update_layout(
-        title=f"Portfolio Composition ({int(alpha*100)}th Percentile Outcome) - Real Dollars",
+        title=f"Portfolio Composition ({ordinal(risk_percentile_val)} Percentile Outcome) - Real Dollars",
         xaxis_title="Years into Retirement",
         yaxis_title="Value ($)",
         yaxis_tickformat="$,.0f",
@@ -390,32 +440,3 @@ if 'results' in st.session_state:
     )
     
     st.plotly_chart(fig3, use_container_width=True)
-    
-    # Summary Statistics
-    st.subheader("📋 Summary")
-    col1, col2, col3, col4 = st.columns(4)
-    
-    final_median = stats['portfolio']['median'][-1]
-    final_lower = stats['portfolio']['lower'][-1]
-    
-    with col1:
-        st.metric(
-            "Final Portfolio (Median)",
-            f"${final_median:,.0f}",
-            delta=f"{(final_median/params['initial_net_worth']-1)*100:.1f}%"
-        )
-    
-    with col2:
-        st.metric(
-            "Final Portfolio (Risk)",
-            f"${max(0, final_lower):,.0f}",
-            delta=f"{(final_lower/params['initial_net_worth']-1)*100:.1f}%" if final_lower > 0 else "Depleted"
-        )
-    
-    with col3:
-        ruin_prob = np.mean(results['portfolio_vals'][-1, :] <= 0) * 100
-        st.metric("Ruin Probability", f"{ruin_prob:.1f}%")
-    
-    with col4:
-        withdrawal_shortfall = np.mean(results['withdrawal_vals'] < params['annual_spend']) * 100
-        st.metric("Withdrawal Shortfall Risk", f"{withdrawal_shortfall:.1f}%")
