@@ -163,7 +163,7 @@ def run_simulation(
     initial_cash = min(initial_cash_target, initial_net_worth)
     initial_equity = initial_net_worth - initial_cash
     
-    # State Arrays
+    # State Arrays (All in Real Dollars)
     portfolio_values = np.zeros((years + 1, n_paths))
     cash_values = np.zeros((years + 1, n_paths))
     equity_values = np.zeros((years + 1, n_paths))
@@ -173,7 +173,7 @@ def run_simulation(
     equity_values[0, :] = initial_equity
     
     # Detailed tracking
-    withdrawals_real = np.zeros((years, n_paths))
+    withdrawals = np.zeros((years, n_paths))
     market_returns = np.zeros((years, n_paths))
     panic_flags = np.zeros((years, n_paths), dtype=bool)
     withdrawals_from_cash = np.zeros((years, n_paths))
@@ -183,7 +183,6 @@ def run_simulation(
     # Reset Arrays
     current_equity = np.full(n_paths, float(initial_equity))
     current_cash = np.full(n_paths, float(initial_cash))
-    inflation_index = 1.0
     
     # Initialize Histories for AR Model
     if use_ar_model and ar_model:
@@ -193,41 +192,44 @@ def run_simulation(
         current_history_windows = np.tile(ar_model.history_window.reshape(1, -1), (n_paths, 1))
 
     for t in range(1, years + 1):
-        # 1. Market Movement
+        # 1. Market Movement (Nominal)
         if use_ar_model and ar_model:
-            market_return = ar_model.simulate_year(current_history_windows, simulations=n_paths)
+            market_return_nominal = ar_model.simulate_year(current_history_windows, simulations=n_paths)
             
             # Update History (Slide window)
-            # Shift right: [New, t-1, t-2 ...]
             current_history_windows = np.roll(current_history_windows, shift=1, axis=1)
-            
-            # FIX: market_return is now 1D (n_paths,), so no slicing needed
-            current_history_windows[:, 0] = market_return
+            current_history_windows[:, 0] = market_return_nominal
         else:
             # Ensure residuals is a 1D array for np.random.choice
             residuals = np.asarray(residuals).ravel()
-            market_return = mu + np.random.choice(residuals, n_paths)
+            market_return_nominal = mu + np.random.choice(residuals, n_paths)
             
-        # Store market return
-        market_returns[t-1, :] = market_return
+        # Store NOMINAL market return for analysis/display if needed, 
+        # but use REAL return for portfolio growth
+        market_returns[t-1, :] = market_return_nominal
+        
+        # Convert to REAL Return: (1 + r_nom) / (1 + i) - 1
+        real_market_return = (1 + market_return_nominal) / (1 + inflation_rate) - 1
+        
+        # Real Cash Return: (1 + 0) / (1 + i) - 1 (Cash loses purchasing power)
+        real_cash_return = (1.0) / (1 + inflation_rate) - 1
 
-        # 2. Update Equity Value
-        # FIX: Use np.maximum for vectorized max operation. standard max() collapses the array.
-        current_equity = np.maximum(0.0, current_equity * (1 + market_return))
+        # 2. Update Asset Values (Real Terms)
+        current_equity = np.maximum(0.0, current_equity * (1 + real_market_return))
+        current_cash = np.maximum(0.0, current_cash * (1 + real_cash_return))
         
-        # 3. Withdrawals
-        inflation_index *= (1 + inflation_rate)
-        target_spend_nominal = annual_spend * inflation_index
+        # 3. Withdrawals (Real Terms)
+        # Annual spend is constant in real terms
+        target_spend_real = annual_spend
         
-        # FIX: Use np.maximum/np.minimum for vectorized operations to preserve path data
-        # Note: current_equity is already floored at 0.0 above, so total_liquid_assets is safe
         total_liquid_assets = current_equity + current_cash 
         
-        # Spending Cap (Solvency based)
-        desired_withdrawal = np.minimum(target_spend_nominal, total_liquid_assets * spending_cap_pct)
+        # Spending Cap (Solvency based) - 4% of current portfolio value (Real)
+        desired_withdrawal = np.minimum(target_spend_real, total_liquid_assets * spending_cap_pct)
         
         # Smart Hedged Logic (Panic vs Normal) - Vectorized
-        panic_mask = market_return < panic_threshold
+        # Panic is triggered by NOMINAL drops (psychological)
+        panic_mask = market_return_nominal < panic_threshold
         panic_flags[t-1, :] = panic_mask
         
         has_cash_mask = current_cash > 0
@@ -255,15 +257,14 @@ def run_simulation(
         # Store withdrawal details
         withdrawals_from_cash[t-1, :] = from_cash
         withdrawals_from_equity[t-1, :] = from_equity
-        withdrawals_real[t-1, :] = (from_cash + from_equity) / inflation_index
+        withdrawals[t-1, :] = from_cash + from_equity
         
         # 4. Cash Buffer Replenishment (in Normal Markets)
-        # If market is stable (not panic), refill cash from equity up to target
-        # target_spend_nominal is the inflated annual spend for this year
-        target_cash_level = target_spend_nominal * buffer_years
+        # Target buffer is based on real spending needs
+        target_cash_level = target_spend_real * buffer_years
         
         # Identify paths that are: 
-        # 1. Not in panic (mask2 represents Normal Market from above)
+        # 1. Not in panic (mask2)
         # 2. Have less cash than target
         replenish_mask = mask2 & (current_cash < target_cash_level)
         
@@ -285,7 +286,7 @@ def run_simulation(
             
     return {
         'portfolio_values': portfolio_values,
-        'withdrawal_values': withdrawals_real,
+        'withdrawal_values': withdrawals,
         'cash_values': cash_values,
         'equity_values': equity_values,
         'market_returns': market_returns,

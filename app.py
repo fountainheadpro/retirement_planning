@@ -14,6 +14,7 @@ st.set_page_config(
 )
 
 st.title("📈 Retirement Portfolio Simulator")
+st.caption("All monetary values are displayed in Today's Dollars (Real Purchasing Power).")
 st.markdown("""
 This tool uses **Conformal Prediction via Residual Sampling** or **Mean Reversion via Ornstein-Uhlenbeck** to model future market behavior,
 ensuring fat-tail events (2000, 2008) are represented in risk projections.
@@ -171,6 +172,7 @@ if run_button or 'results' not in st.session_state:
             ar_model=mean_reversion_model,
             spending_cap_pct=spending_cap_pct
         )
+        # Use REAL (Inflation-Adjusted) values for all visualizations
         portfolio_vals = sim_results['portfolio_values']
         withdrawal_vals = sim_results['withdrawal_values']
         cash_vals = sim_results['cash_values']
@@ -201,7 +203,7 @@ if 'results' in st.session_state:
     years_withdraw = list(range(1, params['years'] + 1))
     
     # Portfolio Value Chart
-    st.subheader("📊 Portfolio Value Projection")
+    st.subheader("📊 Portfolio Value Projection (Real Dollars)")
     
     fig1 = go.Figure()
     
@@ -252,7 +254,7 @@ if 'results' in st.session_state:
         )
     
     fig1.update_layout(
-        title=f"Projected Portfolio Value (Start: ${params['initial_net_worth']:,} | History: {params['history_years']} Years)",
+        title=f"Projected Portfolio Value (Start: ${params['initial_net_worth']:,} | History: {params['history_years']} Years) - Real Dollars",
         xaxis_title="Years into Retirement",
         yaxis_title="Portfolio Value ($)",
         yaxis_tickformat="$,.0f",
@@ -335,16 +337,25 @@ if 'results' in st.session_state:
     st.plotly_chart(fig2, use_container_width=True)
 
     # Asset Allocation Chart
-    st.subheader("📊 Asset Allocation (Risk Scenario)")
+    st.subheader("📊 Asset Allocation (Risk Scenario) - Real Dollars")
     
-    # Identify the specific path corresponding to the risk percentile (e.g., 5th percentile)
+    # Define alpha for the title (was previously defined later)
     alpha = (1 - params['confidence']) / 2
-    final_values = results['portfolio_vals'][-1, :]
-    sorted_indices = np.argsort(final_values)
-    risk_rank = int(len(final_values) * alpha)
-    risk_path_idx = sorted_indices[risk_rank]
     
-    # Extract cash and equity for this risk path
+    # Improved Risk Path Selection: Nearest Neighbor to the Risk Boundary Curve
+    # 1. Get the calculated risk boundary (lower percentile curve)
+    risk_boundary_curve = stats['portfolio']['lower']
+    
+    # 2. Calculate Euclidean distance (sum of squared differences) for every path
+    # portfolio_vals is shape (years+1, n_paths), risk_boundary is shape (years+1,)
+    # We broadcast subtraction across paths
+    differences = results['portfolio_vals'] - risk_boundary_curve[:, np.newaxis]
+    distances = np.sum(differences**2, axis=0)
+    
+    # 3. Find the index of the path with the minimum distance
+    risk_path_idx = np.argmin(distances)
+    
+    # Extract cash and equity for this representative risk path
     risk_cash = results['cash_vals'][:, risk_path_idx]
     risk_equity = results['equity_vals'][:, risk_path_idx]
     
@@ -369,7 +380,7 @@ if 'results' in st.session_state:
     ))
     
     fig3.update_layout(
-        title=f"Portfolio Composition ({int(alpha*100)}th Percentile Outcome)",
+        title=f"Portfolio Composition ({int(alpha*100)}th Percentile Outcome) - Real Dollars",
         xaxis_title="Years into Retirement",
         yaxis_title="Value ($)",
         yaxis_tickformat="$,.0f",
