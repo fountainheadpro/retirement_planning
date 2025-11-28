@@ -1,5 +1,5 @@
 """
-Conformal Retirement Portfolio Simulator - Streamlit App
+Retirement Portfolio Simulator - Streamlit App
 """
 import streamlit as st
 import plotly.graph_objects as go
@@ -13,7 +13,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📈 Conformal Retirement Portfolio Simulator")
+st.title("📈 Retirement Portfolio Simulator")
 st.markdown("""
 This tool uses **Conformal Prediction via Residual Sampling** or **Mean Reversion via Ornstein-Uhlenbeck** to model future market behavior,
 ensuring fat-tail events (2000, 2008) are represented in risk projections.
@@ -21,6 +21,9 @@ ensuring fat-tail events (2000, 2008) are represented in risk projections.
 
 # Sidebar Configuration
 st.sidebar.header("⚙️ Configuration")
+
+# Run Simulation Button (Moved to Top)
+run_button = st.sidebar.button("🚀 Run Simulation", type="primary", use_container_width=True)
 
 st.sidebar.subheader("Simulation Mode")
 use_mean_reversion = st.sidebar.checkbox(
@@ -121,8 +124,6 @@ history_years = st.sidebar.slider(
     help="Look-back window for calibration"
 )
 
-# Run Simulation Button
-run_button = st.sidebar.button("🚀 Run Simulation", type="primary", use_container_width=True)
 
 # Cache data fetching
 @st.cache_data(ttl=3600)
@@ -156,7 +157,7 @@ if run_button or 'results' not in st.session_state:
         st.sidebar.info(f"Samples: {len(residuals)} years")
 
     with st.spinner(f"Running {n_paths:,} simulations..."):
-        portfolio_vals, withdrawal_vals = run_simulation(
+        sim_results = run_simulation(
             initial_net_worth=initial_net_worth,
             annual_spend=annual_spend,
             buffer_years=buffer_years,
@@ -170,11 +171,17 @@ if run_button or 'results' not in st.session_state:
             ar_model=mean_reversion_model,
             spending_cap_pct=spending_cap_pct
         )
+        portfolio_vals = sim_results['portfolio_values']
+        withdrawal_vals = sim_results['withdrawal_values']
+        cash_vals = sim_results['cash_values']
+        equity_vals = sim_results['equity_values']
     
     stats = calculate_statistics(portfolio_vals, withdrawal_vals, confidence)
     st.session_state['results'] = {
         'portfolio_vals': portfolio_vals,
         'withdrawal_vals': withdrawal_vals,
+        'cash_vals': cash_vals,
+        'equity_vals': equity_vals,
         'stats': stats,
         'params': {
             'years': years,
@@ -326,6 +333,52 @@ if 'results' in st.session_state:
     )
     
     st.plotly_chart(fig2, use_container_width=True)
+
+    # Asset Allocation Chart
+    st.subheader("📊 Asset Allocation (Risk Scenario)")
+    
+    # Identify the specific path corresponding to the risk percentile (e.g., 5th percentile)
+    alpha = (1 - params['confidence']) / 2
+    final_values = results['portfolio_vals'][-1, :]
+    sorted_indices = np.argsort(final_values)
+    risk_rank = int(len(final_values) * alpha)
+    risk_path_idx = sorted_indices[risk_rank]
+    
+    # Extract cash and equity for this risk path
+    risk_cash = results['cash_vals'][:, risk_path_idx]
+    risk_equity = results['equity_vals'][:, risk_path_idx]
+    
+    fig3 = go.Figure()
+    
+    fig3.add_trace(go.Scatter(
+        x=years_range,
+        y=risk_cash,
+        mode='lines',
+        line=dict(width=0.5, color='rgb(131, 90, 241)'),
+        stackgroup='one',
+        name='Cash Buffer'
+    ))
+    
+    fig3.add_trace(go.Scatter(
+        x=years_range,
+        y=risk_equity,
+        mode='lines',
+        line=dict(width=0.5, color='rgb(0, 200, 100)'),
+        stackgroup='one',
+        name='Equity (S&P 500)'
+    ))
+    
+    fig3.update_layout(
+        title=f"Portfolio Composition ({int(alpha*100)}th Percentile Outcome)",
+        xaxis_title="Years into Retirement",
+        yaxis_title="Value ($)",
+        yaxis_tickformat="$,.0f",
+        hovermode='x unified',
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        height=450
+    )
+    
+    st.plotly_chart(fig3, use_container_width=True)
     
     # Summary Statistics
     st.subheader("📋 Summary")

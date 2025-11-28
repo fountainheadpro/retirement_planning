@@ -165,8 +165,20 @@ def run_simulation(
     
     # State Arrays
     portfolio_values = np.zeros((years + 1, n_paths))
+    cash_values = np.zeros((years + 1, n_paths))
+    equity_values = np.zeros((years + 1, n_paths))
+    
     portfolio_values[0, :] = initial_net_worth
+    cash_values[0, :] = initial_cash
+    equity_values[0, :] = initial_equity
+    
+    # Detailed tracking
     withdrawals_real = np.zeros((years, n_paths))
+    market_returns = np.zeros((years, n_paths))
+    panic_flags = np.zeros((years, n_paths), dtype=bool)
+    withdrawals_from_cash = np.zeros((years, n_paths))
+    withdrawals_from_equity = np.zeros((years, n_paths))
+    replenishments = np.zeros((years, n_paths))
     
     # Reset Arrays
     current_equity = np.full(n_paths, float(initial_equity))
@@ -195,6 +207,9 @@ def run_simulation(
             # Ensure residuals is a 1D array for np.random.choice
             residuals = np.asarray(residuals).ravel()
             market_return = mu + np.random.choice(residuals, n_paths)
+            
+        # Store market return
+        market_returns[t-1, :] = market_return
 
         # 2. Update Equity Value
         # FIX: Use np.maximum for vectorized max operation. standard max() collapses the array.
@@ -213,6 +228,8 @@ def run_simulation(
         
         # Smart Hedged Logic (Panic vs Normal) - Vectorized
         panic_mask = market_return < panic_threshold
+        panic_flags[t-1, :] = panic_mask
+        
         has_cash_mask = current_cash > 0
         
         # Allocation Arrays
@@ -235,11 +252,48 @@ def run_simulation(
         current_cash -= from_cash
         current_equity -= from_equity
         
+        # Store withdrawal details
+        withdrawals_from_cash[t-1, :] = from_cash
+        withdrawals_from_equity[t-1, :] = from_equity
+        withdrawals_real[t-1, :] = (from_cash + from_equity) / inflation_index
+        
+        # 4. Cash Buffer Replenishment (in Normal Markets)
+        # If market is stable (not panic), refill cash from equity up to target
+        # target_spend_nominal is the inflated annual spend for this year
+        target_cash_level = target_spend_nominal * buffer_years
+        
+        # Identify paths that are: 
+        # 1. Not in panic (mask2 represents Normal Market from above)
+        # 2. Have less cash than target
+        replenish_mask = mask2 & (current_cash < target_cash_level)
+        
+        if np.any(replenish_mask):
+            # Calculate shortfall
+            shortfall = target_cash_level - current_cash[replenish_mask]
+            
+            # Move funds from equity to cash, capped by available equity
+            to_transfer = np.minimum(shortfall, current_equity[replenish_mask])
+            
+            current_cash[replenish_mask] += to_transfer
+            current_equity[replenish_mask] -= to_transfer
+            replenishments[t-1, replenish_mask] = to_transfer
+        
         # Store
         portfolio_values[t, :] = current_equity + current_cash
-        withdrawals_real[t-1, :] = (from_cash + from_equity) / inflation_index
+        cash_values[t, :] = current_cash
+        equity_values[t, :] = current_equity
             
-    return portfolio_values, withdrawals_real
+    return {
+        'portfolio_values': portfolio_values,
+        'withdrawal_values': withdrawals_real,
+        'cash_values': cash_values,
+        'equity_values': equity_values,
+        'market_returns': market_returns,
+        'panic_flags': panic_flags,
+        'withdrawals_from_cash': withdrawals_from_cash,
+        'withdrawals_from_equity': withdrawals_from_equity,
+        'replenishments': replenishments
+    }
 
 def _source_funds(
     desired: float,
