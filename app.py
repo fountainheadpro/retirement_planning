@@ -402,16 +402,17 @@ if 'results' in st.session_state:
     risk_percentile_val = int(alpha * 100)
     
     # Calculate real cash return for display in tooltip
-    real_cash_return_for_display = (1 + params['cash_interest_rate']) / (1 + params['inflation_rate']) - 1
+    # Use variables directly from widgets to avoid KeyError on first run/stale state
+    real_cash_return_for_display = (1 + cash_interest_rate) / (1 + inflation_rate) - 1
 
     st.subheader("📊 Asset Allocation (Risk Scenario) - Real Dollars", help=f"""
 This chart shows the composition of your portfolio for a specific "risk scenario" path, selected as the closest trajectory to the {ordinal(risk_percentile_val)} percentile outcome from the Portfolio Projection.
 
 **Cash Buffer Management:**
--   **Target:** A cash buffer is maintained at {params['buffer_years']} years of annual spending.
--   **Withdrawals:** During normal market conditions, withdrawals come primarily from equity. If the market experiences a significant drop (below {params['panic_threshold']:.0%}) or if the overall market is in a drawdown, withdrawals will prioritize using cash from the buffer.
+-   **Target:** A cash buffer is maintained at {buffer_years} years of annual spending.
+-   **Withdrawals:** During normal market conditions, withdrawals come primarily from equity. If the market experiences a significant drop (below {panic_threshold:.0%}) or if the overall market is in a drawdown, withdrawals will prioritize using cash from the buffer.
 -   **Replenishment:** The cash buffer is only replenished from equity when the overall market has recovered to its previous peak (High Water Mark). This strategy avoids selling equities at a loss to refill cash during drawdowns.
--   **Cash Growth:** Cash in the buffer grows at the nominal interest rate of {params['cash_interest_rate']:.1%} (equivalent to {real_cash_return_for_display:.1%} real return given {params['inflation_rate']:.1%} inflation). This aims to prevent it from losing purchasing power if `cash_interest_rate` matches `inflation_rate`.
+-   **Cash Growth:** Cash in the buffer grows at the nominal interest rate of {cash_interest_rate:.1%} (equivalent to {real_cash_return_for_display:.1%} real return given {inflation_rate:.1%} inflation). This aims to prevent it from losing purchasing power if `cash_interest_rate` matches `inflation_rate`.
 """)
     
     # Improved Risk Path Selection: Nearest Neighbor to the Risk Boundary Curve
