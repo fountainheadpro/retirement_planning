@@ -31,15 +31,6 @@ use_mean_reversion = st.sidebar.checkbox(
 
 # Mean reversion model parameters
 if use_mean_reversion:
-    mr_lookback_window = st.sidebar.slider(
-        "Mean Reversion Lookback (Months)",
-        min_value=12,
-        max_value=240,
-        value=120,
-        step=12,
-        help="Number of recent months to use for model calibration"
-    )
-
     ar_order = st.sidebar.selectbox(
         "Autoregressive Order",
         options=[1, 2, 3, 4, 5],
@@ -47,7 +38,6 @@ if use_mean_reversion:
         help="Number of years to use in autoregression (AR order)"
     )
 else:
-    mr_lookback_window = None
     ar_order = 1
 
 st.sidebar.subheader("Portfolio Settings")
@@ -161,7 +151,6 @@ if run_button or 'results' not in st.session_state:
     if use_mean_reversion:
         st.sidebar.success(f"Mean Reversion Model Calibrated")
         st.sidebar.info(f"AR Order: {ar_order}")
-        st.sidebar.info(f"History: {mr_lookback_window} months")
     else:
         st.sidebar.success(f"Mean Return: {mu:.2%}")
         st.sidebar.info(f"Samples: {len(residuals)} years")

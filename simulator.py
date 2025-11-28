@@ -192,6 +192,8 @@ def run_simulation(
             # FIX: market_return is now 1D (n_paths,), so no slicing needed
             current_history_windows[:, 0] = market_return
         else:
+            # Ensure residuals is a 1D array for np.random.choice
+            residuals = np.asarray(residuals).ravel()
             market_return = mu + np.random.choice(residuals, n_paths)
 
         # 2. Update Equity Value
