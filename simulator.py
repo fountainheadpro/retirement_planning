@@ -156,8 +156,13 @@ def run_simulation(
     panic_threshold, inflation_rate, n_paths,
     mu, residuals, 
     use_ar_model=True, ar_model=None, 
-    spending_cap_pct=0.04
+    spending_cap_pct=0.04,
+    cash_interest_rate=None
 ):
+    # Default cash interest to inflation if not specified (Real return = 0%)
+    if cash_interest_rate is None:
+        cash_interest_rate = inflation_rate
+
     # Initial Allocation
     initial_cash_target = annual_spend * buffer_years
     initial_cash = min(initial_cash_target, initial_net_worth)
@@ -219,8 +224,8 @@ def run_simulation(
         # Convert to REAL Return: (1 + r_nom) / (1 + i) - 1
         real_market_return = (1 + market_return_nominal) / (1 + inflation_rate) - 1
         
-        # Real Cash Return: (1 + 0) / (1 + i) - 1 (Cash loses purchasing power)
-        real_cash_return = (1.0) / (1 + inflation_rate) - 1
+        # Real Cash Return
+        real_cash_return = (1.0 + cash_interest_rate) / (1.0 + inflation_rate) - 1.0
 
         # 2. Update Asset Values (Real Terms)
         current_equity = np.maximum(0.0, current_equity * (1 + real_market_return))

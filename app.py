@@ -83,6 +83,15 @@ with st.sidebar.form("config_form"):
             value=2,
             help="Years of expenses to keep in cash buffer"
         )
+        
+        cash_interest_rate = st.slider(
+            "Cash Interest Rate (%)",
+            min_value=0.0,
+            max_value=10.0,
+            value=3.0,
+            step=0.5,
+            help="Nominal interest rate earned on cash buffer. Defaults to matching inflation if not set."
+        ) / 100
 
         spending_cap_pct = st.slider(
             "Spending Cap (% of Portfolio)",
@@ -178,7 +187,8 @@ if submitted or 'results' not in st.session_state:
             residuals=residuals,
             use_ar_model=use_mean_reversion,
             ar_model=mean_reversion_model,
-            spending_cap_pct=spending_cap_pct
+            spending_cap_pct=spending_cap_pct,
+            cash_interest_rate=cash_interest_rate
         )
         # Use REAL (Inflation-Adjusted) values for all visualizations
         portfolio_vals = sim_results['portfolio_values']
@@ -198,7 +208,8 @@ if submitted or 'results' not in st.session_state:
             'initial_net_worth': initial_net_worth,
             'annual_spend': annual_spend,
             'confidence': confidence,
-            'history_years': history_years
+            'history_years': history_years,
+            'cash_interest_rate': cash_interest_rate
         }
     }
 
