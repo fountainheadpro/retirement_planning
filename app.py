@@ -322,7 +322,7 @@ if 'results' in st.session_state:
         height=450
     )
     
-    st.plotly_chart(fig1, use_container_width=True)
+    st.plotly_chart(fig1, width="stretch")
     
     # Withdrawal Capacity Chart
     st.subheader("💰 Withdrawal Capacity (Inflation Adjusted)")
@@ -394,7 +394,7 @@ if 'results' in st.session_state:
         height=450
     )
     
-    st.plotly_chart(fig2, use_container_width=True)
+    st.plotly_chart(fig2, width="stretch")
 
     # Asset Allocation Chart
     # Define alpha for the title
@@ -410,7 +410,7 @@ This chart shows the composition of your portfolio for a specific "risk scenario
 
 **Cash Buffer Management:**
 -   **Target:** A cash buffer is maintained at {buffer_years} years of annual spending.
--   **Withdrawals:** During normal market conditions, withdrawals come primarily from equity. If the market experiences a significant drop (below {panic_threshold:.0%}) or if the overall market is in a drawdown, withdrawals will prioritize using cash from the buffer.
+-   **Withdrawals:** During normal market conditions, withdrawals come primarily from equity. If the market experiences a significant drop (return below {panic_threshold:.0%}) or if the overall market is in a drawdown, withdrawals will prioritize using cash from the buffer.
 -   **Replenishment:** The cash buffer is only replenished from equity when the overall market has recovered to its previous peak (High Water Mark). This strategy avoids selling equities at a loss to refill cash during drawdowns.
 -   **Cash Growth:** Cash in the buffer grows at the nominal interest rate of {cash_interest_rate:.1%} (equivalent to {real_cash_return_for_display:.1%} real return given {inflation_rate:.1%} inflation). This aims to prevent it from losing purchasing power if `cash_interest_rate` matches `inflation_rate`.
 """)
@@ -462,4 +462,4 @@ This chart shows the composition of your portfolio for a specific "risk scenario
         height=450
     )
     
-    st.plotly_chart(fig3, use_container_width=True)
+    st.plotly_chart(fig3, width="stretch")
