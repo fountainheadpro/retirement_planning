@@ -14,6 +14,7 @@ st.set_page_config(
 )
 
 st.title("📈 Retirement Portfolio Simulator")
+st.caption("All monetary values are displayed in Today's Dollars (Real Purchasing Power).")
 st.markdown("""
 This tool uses **Conformal Prediction via Residual Sampling** or **Mean Reversion via Ornstein-Uhlenbeck** to model future market behavior,
 ensuring fat-tail events (2000, 2008) are represented in risk projections.
@@ -172,10 +173,10 @@ if run_button or 'results' not in st.session_state:
             spending_cap_pct=spending_cap_pct
         )
         # Use REAL (Inflation-Adjusted) values for all visualizations
-        portfolio_vals = sim_results['portfolio_values_real']
+        portfolio_vals = sim_results['portfolio_values']
         withdrawal_vals = sim_results['withdrawal_values']
-        cash_vals = sim_results['cash_values_real']
-        equity_vals = sim_results['equity_values_real']
+        cash_vals = sim_results['cash_values']
+        equity_vals = sim_results['equity_values']
     
     stats = calculate_statistics(portfolio_vals, withdrawal_vals, confidence)
     st.session_state['results'] = {
