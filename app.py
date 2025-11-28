@@ -339,14 +339,20 @@ if 'results' in st.session_state:
     # Asset Allocation Chart
     st.subheader("📊 Asset Allocation (Risk Scenario) - Real Dollars")
     
-    # Identify the specific path corresponding to the risk percentile (e.g., 5th percentile)
-    alpha = (1 - params['confidence']) / 2
-    final_values = results['portfolio_vals'][-1, :]
-    sorted_indices = np.argsort(final_values)
-    risk_rank = int(len(final_values) * alpha)
-    risk_path_idx = sorted_indices[risk_rank]
+    # Improved Risk Path Selection: Nearest Neighbor to the Risk Boundary Curve
+    # 1. Get the calculated risk boundary (lower percentile curve)
+    risk_boundary_curve = stats['portfolio']['lower']
     
-    # Extract cash and equity for this risk path
+    # 2. Calculate Euclidean distance (sum of squared differences) for every path
+    # portfolio_vals is shape (years+1, n_paths), risk_boundary is shape (years+1,)
+    # We broadcast subtraction across paths
+    differences = results['portfolio_vals'] - risk_boundary_curve[:, np.newaxis]
+    distances = np.sum(differences**2, axis=0)
+    
+    # 3. Find the index of the path with the minimum distance
+    risk_path_idx = np.argmin(distances)
+    
+    # Extract cash and equity for this representative risk path
     risk_cash = results['cash_vals'][:, risk_path_idx]
     risk_equity = results['equity_vals'][:, risk_path_idx]
     
