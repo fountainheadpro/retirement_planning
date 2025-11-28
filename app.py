@@ -339,6 +339,9 @@ if 'results' in st.session_state:
     # Asset Allocation Chart
     st.subheader("📊 Asset Allocation (Risk Scenario) - Real Dollars")
     
+    # Define alpha for the title (was previously defined later)
+    alpha = (1 - params['confidence']) / 2
+    
     # Improved Risk Path Selection: Nearest Neighbor to the Risk Boundary Curve
     # 1. Get the calculated risk boundary (lower percentile curve)
     risk_boundary_curve = stats['portfolio']['lower']
