@@ -184,6 +184,10 @@ def run_simulation(
     current_equity = np.full(n_paths, float(initial_equity))
     current_cash = np.full(n_paths, float(initial_cash))
     
+    # Track Market High Water Mark
+    market_index = np.ones(n_paths)
+    market_peak = np.ones(n_paths)
+    
     # Initialize Histories for AR Model
     if use_ar_model and ar_model:
         # FIX: Tile correctly for (n_paths, p). 
@@ -207,6 +211,10 @@ def run_simulation(
         # Store NOMINAL market return for analysis/display if needed, 
         # but use REAL return for portfolio growth
         market_returns[t-1, :] = market_return_nominal
+        
+        # Update Market Index and Peak (High Water Mark)
+        market_index *= (1 + market_return_nominal)
+        market_peak = np.maximum(market_peak, market_index)
         
         # Convert to REAL Return: (1 + r_nom) / (1 + i) - 1
         real_market_return = (1 + market_return_nominal) / (1 + inflation_rate) - 1
@@ -259,17 +267,18 @@ def run_simulation(
         withdrawals_from_equity[t-1, :] = from_equity
         withdrawals[t-1, :] = from_cash + from_equity
         
-        # 4. Cash Buffer Replenishment (in Normal Markets)
-        # Target buffer is based on real spending needs
+        # 4. Cash Buffer Replenishment
+        # Rule: Only replenish if we are at or above the Market High Water Mark (Recovery)
+        # This prevents selling equity during a drawdown to fill cash.
+        
         target_cash_level = target_spend_real * buffer_years
         
-        # Identify paths that are: 
-        # 1. Not in panic (mask2)
-        # 2. Market is positive (Nominal > 0) - Don't sell equity to fill cash in a down market
-        # 3. Have less cash than target
-        
-        positive_market_mask = market_return_nominal > 0
-        replenish_mask = mask2 & positive_market_mask & (current_cash < target_cash_level)
+        # Identify paths that:
+        # 1. Are at High Water Mark (market_index >= market_peak)
+        # 2. Have less cash than target
+        # Note: We use a small epsilon tolerance for float comparison
+        at_peak_mask = market_index >= (market_peak * 0.999)
+        replenish_mask = at_peak_mask & (current_cash < target_cash_level)
         
         if np.any(replenish_mask):
             # Calculate shortfall
