@@ -172,6 +172,15 @@ def run_simulation(
     cash_values[0, :] = initial_cash
     equity_values[0, :] = initial_equity
     
+    # Real Value Tracking
+    portfolio_values_real = np.zeros((years + 1, n_paths))
+    cash_values_real = np.zeros((years + 1, n_paths))
+    equity_values_real = np.zeros((years + 1, n_paths))
+    
+    portfolio_values_real[0, :] = initial_net_worth
+    cash_values_real[0, :] = initial_cash
+    equity_values_real[0, :] = initial_equity
+    
     # Detailed tracking
     withdrawals_real = np.zeros((years, n_paths))
     market_returns = np.zeros((years, n_paths))
@@ -282,12 +291,20 @@ def run_simulation(
         portfolio_values[t, :] = current_equity + current_cash
         cash_values[t, :] = current_cash
         equity_values[t, :] = current_equity
+        
+        # Store Real Values
+        portfolio_values_real[t, :] = (current_equity + current_cash) / inflation_index
+        cash_values_real[t, :] = current_cash / inflation_index
+        equity_values_real[t, :] = current_equity / inflation_index
             
     return {
         'portfolio_values': portfolio_values,
+        'portfolio_values_real': portfolio_values_real,
         'withdrawal_values': withdrawals_real,
         'cash_values': cash_values,
+        'cash_values_real': cash_values_real,
         'equity_values': equity_values,
+        'equity_values_real': equity_values_real,
         'market_returns': market_returns,
         'panic_flags': panic_flags,
         'withdrawals_from_cash': withdrawals_from_cash,

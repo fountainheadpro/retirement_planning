@@ -171,10 +171,11 @@ if run_button or 'results' not in st.session_state:
             ar_model=mean_reversion_model,
             spending_cap_pct=spending_cap_pct
         )
-        portfolio_vals = sim_results['portfolio_values']
+        # Use REAL (Inflation-Adjusted) values for all visualizations
+        portfolio_vals = sim_results['portfolio_values_real']
         withdrawal_vals = sim_results['withdrawal_values']
-        cash_vals = sim_results['cash_values']
-        equity_vals = sim_results['equity_values']
+        cash_vals = sim_results['cash_values_real']
+        equity_vals = sim_results['equity_values_real']
     
     stats = calculate_statistics(portfolio_vals, withdrawal_vals, confidence)
     st.session_state['results'] = {
@@ -201,7 +202,7 @@ if 'results' in st.session_state:
     years_withdraw = list(range(1, params['years'] + 1))
     
     # Portfolio Value Chart
-    st.subheader("📊 Portfolio Value Projection")
+    st.subheader("📊 Portfolio Value Projection (Real Dollars)")
     
     fig1 = go.Figure()
     
@@ -252,7 +253,7 @@ if 'results' in st.session_state:
         )
     
     fig1.update_layout(
-        title=f"Projected Portfolio Value (Start: ${params['initial_net_worth']:,} | History: {params['history_years']} Years)",
+        title=f"Projected Portfolio Value (Start: ${params['initial_net_worth']:,} | History: {params['history_years']} Years) - Real Dollars",
         xaxis_title="Years into Retirement",
         yaxis_title="Portfolio Value ($)",
         yaxis_tickformat="$,.0f",
@@ -335,7 +336,7 @@ if 'results' in st.session_state:
     st.plotly_chart(fig2, use_container_width=True)
 
     # Asset Allocation Chart
-    st.subheader("📊 Asset Allocation (Risk Scenario)")
+    st.subheader("📊 Asset Allocation (Risk Scenario) - Real Dollars")
     
     # Identify the specific path corresponding to the risk percentile (e.g., 5th percentile)
     alpha = (1 - params['confidence']) / 2
@@ -369,7 +370,7 @@ if 'results' in st.session_state:
     ))
     
     fig3.update_layout(
-        title=f"Portfolio Composition ({int(alpha*100)}th Percentile Outcome)",
+        title=f"Portfolio Composition ({int(alpha*100)}th Percentile Outcome) - Real Dollars",
         xaxis_title="Years into Retirement",
         yaxis_title="Value ($)",
         yaxis_tickformat="$,.0f",
