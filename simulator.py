@@ -12,55 +12,89 @@ from statsmodels.tsa.arima.model import ARIMA
 # 1. MARKET MODELS (AR(p) on Residuals)
 # ==========================================
 
+class RandomWalkMarket:
+    """
+    Models the market using simple random sampling from historical residuals (Random Walk).
+    """
+    def __init__(self, mu, residuals):
+        self.mu = mu
+        self.residuals = np.asarray(residuals).ravel()
+        
+    def simulate_matrix(self, years, n_paths):
+        """
+        Generates a matrix of market returns using random sampling.
+        Returns: array of shape (years, n_paths)
+        """
+        # Generate all random returns at once
+        random_returns = np.random.choice(self.residuals, size=(years, n_paths))
+        return self.mu + random_returns
+
+class BlockBootstrapMarket:
+    """
+    Models the market by resampling blocks of historical returns to preserve
+    correlation structure (autocorrelation, volatility clustering).
+    """
+    def __init__(self, history_returns, block_size=5):
+        self.block_size = block_size
+        self.history = np.asarray(history_returns).ravel()
+        if len(self.history) < self.block_size:
+            raise ValueError(f"History length {len(self.history)} is shorter than block size {self.block_size}")
+        
+    def simulate_matrix(self, years, n_paths):
+        """
+        Generates a matrix of market returns using block bootstrapping.
+        Returns: array of shape (years, n_paths)
+        """
+        n_history = len(self.history)
+        n_blocks = int(np.ceil(years / self.block_size))
+        
+        # Output matrix
+        market_matrix = np.zeros((years, n_paths))
+        
+        for i in range(n_paths):
+            path = []
+            for _ in range(n_blocks):
+                # Pick a random start index
+                start_idx = np.random.randint(0, n_history - self.block_size + 1)
+                block = self.history[start_idx : start_idx + self.block_size]
+                path.extend(block)
+            
+            # Trim to exact number of years and assign
+            market_matrix[:, i] = path[:years]
+            
+        return market_matrix
+
 class MeanRevertingMarket:
     """
     Models the market using an AR(p) process on Returns.
-    R_t = Intercept + (Phi_1 * R_{t-1}) + ... + (Phi_p * R_{t-p}) + Noise
-    
-    This captures multi-year market memory (cycles), allowing the model to learn 
-    patterns like "Deep crashes are often followed by multi-year recoveries."
     """
     def __init__(self, ar_order=1):
         self.ar_order = ar_order
-        self.ar_coeffs = None # Array of shape (p,)
+        self.ar_coeffs = None 
         self.intercept = None
         self.residual_std = None
-        # Tracks the last 'p' years of returns to seed the simulation
         self.history_window = np.zeros(ar_order) 
 
     def calibrate_from_history(self, historical_returns):
-        """
-        Calibrates AR(p) parameters using statsmodels ARIMA.
-        Uses ARIMA(p, 0, 0) which is equivalent to an AR(p) model on stationary data.
-        """
+        # ... (keep existing implementation) ...
         # FIX: Ensure data is 1D flat array. yfinance sometimes returns (N, 1) which breaks matrix math.
         data = np.array(historical_returns).ravel()
         p = self.ar_order
         
-        # We need enough data to fit the model confidently
         if len(data) < p + 10:
             raise ValueError(f"Not enough data for AR({p}). Need at least {p+10} years.")
 
         try:
-            # Fit ARIMA(p, 0, 0) with a constant term (trend='c')
-            # This models: y_t = const + ar_1*y_{t-1} + ... + error_t
             model = ARIMA(data, order=(p, 0, 0), trend='c')
             res = model.fit()
             
-            # Extract Parameters
-            # params contains [const, ar.L1, ar.L2, ... sigma2]
             self.intercept = res.params[0]
-            self.ar_coeffs = res.arparams # This helper gives just the AR coefficients
-            self.residual_std = np.sqrt(res.params[-1]) # Last param is sigma2
+            self.ar_coeffs = res.arparams 
+            self.residual_std = np.sqrt(res.params[-1]) 
             
             # Set State (The most recent 'p' years from history)
-            # We need this to start the simulation "from today"
-            # History needs to be [t-1, t-2, ... t-p]
-            # data[-p:] gives [t-p ... t-1], so we reverse it
             self.history_window = data[-p:][::-1] 
             
-            # Calculate Long Term Mean (Analytical)
-            # Mean = Intercept / (1 - sum(coeffs))
             denom = (1 - np.sum(self.ar_coeffs))
             long_term_mean = self.intercept / denom if abs(denom) > 1e-5 else 0.0
             
@@ -72,35 +106,41 @@ class MeanRevertingMarket:
             }
             
         except Exception as e:
-            # Fallback if convergence fails (rare on simple AR)
             st.warning(f"ARIMA fitting failed: {e}. Falling back to synthetic.")
             return None
 
     def simulate_year(self, history_window, simulations=1):
-        """
-        Simulates exactly one year forward based on the history window.
-        Args:
-            history_window: Array of shape (simulations, p) containing [R_{t-1}, ..., R_{t-p}]
-        Returns: 
-            next_return: Array of shape (simulations,)
-        """
+        # ... (keep existing implementation) ...
         if self.ar_coeffs is None:
             raise ValueError("Model not calibrated.")
 
-        # AR(p) Equation: Next = Intercept + Sum(Coeff_i * Lag_i) + Noise
-        # history_window shape: (n_paths, p)
-        # ar_coeffs shape: (p,)
-        
-        # Dot product sums the lagged effects (Result is 1D array of length n_paths)
         deterministic_part = self.intercept + np.dot(history_window, self.ar_coeffs)
-        
-        # FIX: Noise should be 1D (one random shock per simulation path)
-        # Old code (wrong): np.random.normal(..., (simulations, self.ar_order))
         noise = np.random.normal(0, self.residual_std, simulations)
+        return deterministic_part + noise
+
+    def simulate_matrix(self, years, n_paths):
+        """
+        Generates a matrix of market returns using AR(p) simulation.
+        Returns: array of shape (years, n_paths)
+        """
+        if self.ar_coeffs is None:
+            raise ValueError("Model not calibrated.")
+            
+        market_matrix = np.zeros((years, n_paths))
         
-        next_returns = deterministic_part + noise
+        # Initialize windows: shape (n_paths, p)
+        current_history_windows = np.tile(self.history_window.reshape(1, -1), (n_paths, 1))
         
-        return next_returns
+        for t in range(years):
+            # Simulate one step
+            market_return = self.simulate_year(current_history_windows, simulations=n_paths)
+            market_matrix[t, :] = market_return
+            
+            # Update History
+            current_history_windows = np.roll(current_history_windows, shift=1, axis=1)
+            current_history_windows[:, 0] = market_return
+            
+        return market_matrix
 
 @st.cache_data
 def get_sp500_data(history_years=60):
@@ -154,14 +194,17 @@ def get_sp500_residuals(history_years):
 def run_simulation(
     initial_net_worth, annual_spend, buffer_years, years, 
     panic_threshold, inflation_rate, n_paths,
-    mu, residuals, 
-    use_ar_model=True, ar_model=None, 
+    market_model,
     spending_cap_pct=0.04,
     cash_interest_rate=None
 ):
     # Default cash interest to inflation if not specified (Real return = 0%)
     if cash_interest_rate is None:
         cash_interest_rate = inflation_rate
+
+    # Pre-calculate Market Scenarios (Matrix of shape: years x n_paths)
+    # This separates market generation from portfolio logic
+    market_returns_matrix = market_model.simulate_matrix(years, n_paths)
 
     # Initial Allocation
     initial_cash_target = annual_spend * buffer_years
@@ -193,25 +236,10 @@ def run_simulation(
     market_index = np.ones(n_paths)
     market_peak = np.ones(n_paths)
     
-    # Initialize Histories for AR Model
-    if use_ar_model and ar_model:
-        # FIX: Tile correctly for (n_paths, p). 
-        # Explicit reshape guarantees we tile (1, p) into (n_paths, p)
-        # This handles deeper AR orders safely and prevents (N*p, 1) shaping if input was vertical
-        current_history_windows = np.tile(ar_model.history_window.reshape(1, -1), (n_paths, 1))
-
     for t in range(1, years + 1):
         # 1. Market Movement (Nominal)
-        if use_ar_model and ar_model:
-            market_return_nominal = ar_model.simulate_year(current_history_windows, simulations=n_paths)
-            
-            # Update History (Slide window)
-            current_history_windows = np.roll(current_history_windows, shift=1, axis=1)
-            current_history_windows[:, 0] = market_return_nominal
-        else:
-            # Ensure residuals is a 1D array for np.random.choice
-            residuals = np.asarray(residuals).ravel()
-            market_return_nominal = mu + np.random.choice(residuals, n_paths)
+        # Retrieve pre-calculated return for this year
+        market_return_nominal = market_returns_matrix[t-1, :]
             
         # Store NOMINAL market return for analysis/display if needed, 
         # but use REAL return for portfolio growth

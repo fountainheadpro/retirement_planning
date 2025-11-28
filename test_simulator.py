@@ -4,7 +4,7 @@ Tests for the retirement portfolio simulator.
 import numpy as np
 import pytest
 
-from simulator import run_simulation, calculate_statistics, _source_funds, MeanRevertingMarket, create_ar_model
+from simulator import run_simulation, calculate_statistics, _source_funds, MeanRevertingMarket, RandomWalkMarket, create_ar_model
 
 
 class TestSourceFunds:
@@ -88,6 +88,7 @@ class TestRunSimulation:
     
     def test_simulation_shape(self, mock_residuals):
         """Output arrays should have correct dimensions."""
+        model = RandomWalkMarket(mu=0.08, residuals=mock_residuals)
         results = run_simulation(
             initial_net_worth=1_000_000,
             annual_spend=40_000,
@@ -96,9 +97,7 @@ class TestRunSimulation:
             panic_threshold=-0.15,
             inflation_rate=0.03,
             n_paths=100,
-            mu=0.08,
-            residuals=mock_residuals,
-            use_ar_model=False
+            market_model=model
         )
         portfolio = results['portfolio_values']
         withdrawals = results['withdrawal_values']
@@ -108,6 +107,7 @@ class TestRunSimulation:
     
     def test_initial_value_correct(self, mock_residuals):
         """Year 0 should equal initial net worth."""
+        model = RandomWalkMarket(mu=0.08, residuals=mock_residuals)
         results = run_simulation(
             initial_net_worth=1_000_000,
             annual_spend=40_000,
@@ -116,9 +116,7 @@ class TestRunSimulation:
             panic_threshold=-0.15,
             inflation_rate=0.03,
             n_paths=10,
-            mu=0.08,
-            residuals=mock_residuals,
-            use_ar_model=False
+            market_model=model
         )
         portfolio = results['portfolio_values']
         
@@ -128,6 +126,7 @@ class TestRunSimulation:
         """Same seed should produce same results."""
         # Set numpy seed for reproducibility
         np.random.seed(123)
+        model1 = RandomWalkMarket(mu=0.08, residuals=mock_residuals)
         results1 = run_simulation(
             initial_net_worth=1_000_000,
             annual_spend=40_000,
@@ -136,13 +135,12 @@ class TestRunSimulation:
             panic_threshold=-0.15,
             inflation_rate=0.03,
             n_paths=50,
-            mu=0.08,
-            residuals=mock_residuals,
-            use_ar_model=False
+            market_model=model1
         )
         portfolio1 = results1['portfolio_values']
 
         np.random.seed(123)
+        model2 = RandomWalkMarket(mu=0.08, residuals=mock_residuals)
         results2 = run_simulation(
             initial_net_worth=1_000_000,
             annual_spend=40_000,
@@ -151,9 +149,7 @@ class TestRunSimulation:
             panic_threshold=-0.15,
             inflation_rate=0.03,
             n_paths=50,
-            mu=0.08,
-            residuals=mock_residuals,
-            use_ar_model=False
+            market_model=model2
         )
         portfolio2 = results2['portfolio_values']
 
@@ -163,6 +159,7 @@ class TestRunSimulation:
         """Excessive spending should deplete portfolio."""
         # Use negative residuals to ensure depletion
         bad_residuals = np.array([-0.20, -0.15, -0.10])
+        model = RandomWalkMarket(mu=0.0, residuals=bad_residuals)
         results = run_simulation(
             initial_net_worth=500_000,
             annual_spend=100_000,  # 20% withdrawal rate
@@ -171,9 +168,7 @@ class TestRunSimulation:
             panic_threshold=-0.15,
             inflation_rate=0.05,
             n_paths=100,
-            mu=0.0,  # No positive mean return
-            residuals=bad_residuals,
-            use_ar_model=False
+            market_model=model
         )
         portfolio = results['portfolio_values']
         # Some paths should hit zero or near-zero
@@ -183,6 +178,7 @@ class TestRunSimulation:
     
     def test_low_spend_preserves_wealth(self, mock_residuals):
         """Conservative spending should preserve portfolio."""
+        model = RandomWalkMarket(mu=0.08, residuals=mock_residuals)
         results = run_simulation(
             initial_net_worth=5_000_000,
             annual_spend=100_000,  # 2% withdrawal rate
@@ -191,9 +187,7 @@ class TestRunSimulation:
             panic_threshold=-0.15,
             inflation_rate=0.02,
             n_paths=100,
-            mu=0.08,
-            residuals=mock_residuals,
-            use_ar_model=False
+            market_model=model
         )
         portfolio = results['portfolio_values']
         # Median should stay positive
@@ -203,6 +197,7 @@ class TestRunSimulation:
     def test_negative_equity_does_not_create_funds(self):
         """Withdrawal sourcing should not increase equity when returns go below -100%."""
         residuals = np.array([-2.0])  # Forces equity wipeout
+        model = RandomWalkMarket(mu=0.0, residuals=residuals)
         results = run_simulation(
             initial_net_worth=100_000,
             annual_spend=50_000,
@@ -211,9 +206,7 @@ class TestRunSimulation:
             panic_threshold=-0.15,
             inflation_rate=0.0,
             n_paths=1,
-            mu=0.0,
-            residuals=residuals,
-            use_ar_model=False
+            market_model=model
         )
         portfolio = results['portfolio_values']
         withdrawals = results['withdrawal_values']
@@ -225,6 +218,7 @@ class TestRunSimulation:
     def test_buffer_allocation(self, mock_residuals):
         """Cash buffer should be properly allocated."""
         # With 2 years buffer at 50k/year = 100k cash
+        model = RandomWalkMarket(mu=0.0, residuals=np.array([0.0]))
         results = run_simulation(
             initial_net_worth=1_000_000,
             annual_spend=50_000,
@@ -233,9 +227,7 @@ class TestRunSimulation:
             panic_threshold=-0.15,
             inflation_rate=0.0,
             n_paths=1,
-            mu=0.0,  # No market return
-            residuals=np.array([0.0]),  # Zero residual
-            use_ar_model=False
+            market_model=model
         )
         portfolio = results['portfolio_values']
         # With 0% return and 0 inflation, after withdrawal of 50k
@@ -282,6 +274,7 @@ class TestEdgeCases:
     def test_zero_buffer_years(self):
         """Should work with no cash buffer."""
         residuals = np.array([0.0, 0.05, -0.05])
+        model = RandomWalkMarket(mu=0.08, residuals=residuals)
         results = run_simulation(
             initial_net_worth=1_000_000,
             annual_spend=40_000,
@@ -290,9 +283,7 @@ class TestEdgeCases:
             panic_threshold=-0.15,
             inflation_rate=0.03,
             n_paths=10,
-            mu=0.08,
-            residuals=residuals,
-            use_ar_model=False
+            market_model=model
         )
         portfolio = results['portfolio_values']
         assert portfolio.shape == (6, 10)
@@ -402,10 +393,7 @@ class TestARSimulation:
             panic_threshold=-0.15,
             inflation_rate=0.03,
             n_paths=10,
-            mu=0.08,  # Not used in AR mode
-            residuals=np.array([0.0]),  # Not used in AR mode
-            use_ar_model=True,
-            ar_model=calibrated_ar_model
+            market_model=calibrated_ar_model
         )
         portfolio = results['portfolio_values']
         withdrawals = results['withdrawal_values']
@@ -423,10 +411,7 @@ class TestARSimulation:
             panic_threshold=-0.15,
             inflation_rate=0.03,
             n_paths=10,
-            mu=0.08,
-            residuals=np.array([0.0]),
-            use_ar_model=True,
-            ar_model=calibrated_ar_model
+            market_model=calibrated_ar_model
         )
         portfolio = results['portfolio_values']
 
@@ -438,6 +423,7 @@ class TestARSimulation:
         np.random.seed(42)
 
         # Run historical mode
+        model_hist = RandomWalkMarket(mu=0.08, residuals=np.array([-0.1, 0.0, 0.1]))
         results_hist = run_simulation(
             initial_net_worth=1_000_000,
             annual_spend=40_000,
@@ -446,9 +432,7 @@ class TestARSimulation:
             panic_threshold=-0.15,
             inflation_rate=0.0,  # No inflation for cleaner comparison
             n_paths=100,
-            mu=0.08,
-            residuals=np.array([-0.1, 0.0, 0.1]),
-            use_ar_model=False
+            market_model=model_hist
         )
         portfolio_hist = results_hist['portfolio_values']
 
@@ -464,10 +448,7 @@ class TestARSimulation:
             panic_threshold=-0.15,
             inflation_rate=0.0,
             n_paths=100,
-            mu=0.08,
-            residuals=np.array([-0.1, 0.0, 0.1]),
-            use_ar_model=True,
-            ar_model=calibrated_ar_model
+            market_model=calibrated_ar_model
         )
         portfolio_ar = results_ar['portfolio_values']
 
@@ -478,6 +459,7 @@ class TestARSimulation:
     def test_zero_inflation(self):
         """Should work with no inflation."""
         residuals = np.array([0.0])
+        model = RandomWalkMarket(mu=0.08, residuals=residuals)
         results = run_simulation(
             initial_net_worth=1_000_000,
             annual_spend=40_000,
@@ -486,9 +468,7 @@ class TestARSimulation:
             panic_threshold=-0.15,
             inflation_rate=0.0,
             n_paths=10,
-            mu=0.08,
-            residuals=residuals,
-            use_ar_model=False
+            market_model=model
         )
         withdrawals = results['withdrawal_values']
         # With 0% inflation, real withdrawals should be constant
@@ -498,6 +478,7 @@ class TestARSimulation:
     def test_single_path(self):
         """Should work with just one simulation path."""
         residuals = np.array([0.05, -0.05, 0.0])
+        model = RandomWalkMarket(mu=0.08, residuals=residuals)
         results = run_simulation(
             initial_net_worth=1_000_000,
             annual_spend=40_000,
@@ -506,9 +487,7 @@ class TestARSimulation:
             panic_threshold=-0.15,
             inflation_rate=0.03,
             n_paths=1,
-            mu=0.08,
-            residuals=residuals,
-            use_ar_model=False
+            market_model=model
         )
         portfolio = results['portfolio_values']
         withdrawals = results['withdrawal_values']
