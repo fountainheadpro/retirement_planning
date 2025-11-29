@@ -269,8 +269,10 @@ def run_simulation(
         desired_withdrawal = np.minimum(target_spend_real, total_liquid_assets * spending_cap_pct)
         
         # Smart Hedged Logic (Panic vs Normal) - Vectorized
-        # Panic is triggered by NOMINAL drops (psychological)
-        panic_mask = market_return_nominal < panic_threshold
+        # Panic is triggered by NOMINAL drops (psychological) **or** when the
+        # market remains below its prior high-water mark (drawdown). This keeps
+        # withdrawals from equity muted until prices recover.
+        panic_mask = (market_return_nominal < panic_threshold) | (market_index < (market_peak * 0.999))
         panic_flags[t-1, :] = panic_mask
         
         has_cash_mask = current_cash > 0
@@ -346,7 +348,8 @@ def _source_funds(
     market_return: float,
     panic_threshold: float,
     equity: float,
-    cash: float
+    cash: float,
+    in_drawdown: bool = False,
 ) -> float:
     """Calculate actual withdrawal amount based on strategy."""
     allocation = _allocate_withdrawal(
@@ -355,6 +358,7 @@ def _source_funds(
         panic_threshold,
         equity,
         cash,
+        in_drawdown,
     )
     return allocation[0]
 
@@ -365,8 +369,11 @@ def _allocate_withdrawal(
     panic_threshold: float,
     equity: float,
     cash: float,
+    in_drawdown: bool = False,
 ) -> tuple[float, float, float]:
     """Allocate withdrawals between cash and equity without overdrawing.
+
+    Drawdown years trigger the same cash-first behavior as panic years.
 
     Returns a tuple of (total_withdrawal, from_cash, from_equity).
     """
@@ -376,7 +383,9 @@ def _allocate_withdrawal(
 
     actual_withdrawal = min(desired, available_total)
 
-    if market_return < panic_threshold and available_cash > 0:
+    should_use_cash_first = (market_return < panic_threshold) or in_drawdown
+
+    if should_use_cash_first and available_cash > 0:
         from_cash = min(actual_withdrawal, available_cash)
         from_equity = min(actual_withdrawal - from_cash, available_equity)
     else:
