@@ -177,15 +177,15 @@ def create_ar_model(history_years=50, ar_order=1):
                         f"Vol: {stats['volatility']:.1%}, "
                         f"Mean: {stats['mean_return']:.1%}")
         
-    return model, stats_msg
+    return model, stats
 
 @st.cache_data
 def get_sp500_residuals(history_years):
     hist = get_sp500_data(history_years)
-    if hist is None: return None, None, "No Data"
+    if hist is None: return None, None, None # Return None for hist if no data
     mu = np.mean(hist)
     residuals = hist - mu
-    return mu, residuals, None
+    return mu, residuals, hist
 
 # ==========================================
 # 2. SIMULATION ENGINE

@@ -1,11 +1,8 @@
-"""
-Retirement Portfolio Simulator - Streamlit App
-"""
 import streamlit as st
 import plotly.graph_objects as go
 import numpy as np
 
-from simulator import get_sp500_residuals, run_simulation, calculate_statistics, create_ar_model
+from simulator import get_sp500_residuals, run_simulation, calculate_statistics, create_ar_model, RandomWalkMarket, BlockBootstrapMarket, MeanRevertingMarket
 
 def ordinal(n):
     """Return number with ordinal suffix (1st, 2nd, 3rd, 4th)."""
@@ -22,7 +19,7 @@ st.set_page_config(
 st.title("📈 Retirement Portfolio Simulator")
 st.caption("All monetary values are displayed in Today's Dollars (Real Purchasing Power).")
 st.markdown("""
-This tool uses **Conformal Prediction via Residual Sampling** or **Mean Reversion via Ornstein-Uhlenbeck** to model future market behavior,
+This tool uses statistical models to simulate future market behavior,
 ensuring fat-tail events (2000, 2008) are represented in risk projections.
 """)
 
@@ -32,29 +29,24 @@ st.sidebar.header("⚙️ Configuration")
 with st.sidebar.form("config_form"):
     
     with st.expander("Model Configuration", expanded=True):
-        use_mean_reversion = st.checkbox(
-            "Use Mean Reversion Model",
-            value=True,
-            help="Use Ornstein-Uhlenbeck process instead of historical residuals"
+        model_options = ["Random Walk", "Mean Reversion (AR-1)", "Mean Reversion (AR-2)", "Mean Reversion (AR-3)", "Mean Reversion (AR-4)", "Mean Reversion (AR-5)", "Block Bootstrap"]
+        selected_model = st.selectbox(
+            "Market Model",
+            options=model_options,
+            index=model_options.index("Mean Reversion (AR-1)"), # Default to AR-1
+            help="Select the statistical model for simulating market returns."
         )
-
-        # Mean reversion model parameters
-        if use_mean_reversion:
-            ar_order = st.selectbox(
-                "Autoregressive Order",
-                options=[1, 2, 3, 4, 5],
-                index=0,
-                help="Number of years to use in autoregression (AR order)"
-            )
-        else:
-            ar_order = 1
+        
+        block_size = 5 # Default value
+        if selected_model == "Block Bootstrap":
+            block_size = st.slider("Block Size (Years)", 1, 10, 5, help="Length of historical blocks to resample. Preserves historical correlations.")
             
         history_years = st.slider(
             "Historical Data (Years)",
             min_value=20,
             max_value=100,
             value=50,
-            help="Look-back window for calibration"
+            help="Look-back window for calibration. Affects all models."
         )
 
     with st.expander("Portfolio Settings", expanded=True):
@@ -153,26 +145,52 @@ def fetch_market_data(history_years: int):
 if submitted or 'results' not in st.session_state:
     with st.spinner("Fetching market data..."):
         try:
-            if use_mean_reversion:
-                mu, residuals = 0.0, np.array([])
-                ar_model = None
-                stats_msg = ""
+            # Fetch data once for all models
+            mu, residuals, history = fetch_market_data(history_years)
+            
+            if history is None: # Check if market data fetching failed
+                st.error("Failed to fetch market data. Please check your internet connection or try again.")
+                st.stop()
+
+            # Instantiate Market Model based on selection
+            market_model = None
+            model_info_msg = "" # For sidebar info display
+
+            if selected_model == "Random Walk":
+                market_model = RandomWalkMarket(mu, residuals)
+                model_info_msg = f"Random Walk (Mean: {mu:.1%}, Std Dev of Residuals: {np.std(residuals):.1%})"
                 
-                mean_reversion_model, stats_msg = create_ar_model(history_years=history_years, ar_order=ar_order)
-            else:
-                mu, residuals, annual_returns = fetch_market_data(history_years)
-                mean_reversion_model = None
+            elif selected_model == "Block Bootstrap":
+                market_model = BlockBootstrapMarket(history, block_size=block_size)
+                model_info_msg = f"Block Bootstrap (Block Size: {block_size}y, History: {len(history)}y)"
+                
+            elif "Mean Reversion (AR-" in selected_model:
+                ar_p = int(selected_model.split("AR-")[1][:-1]) # Extract AR order from string
+                ar_model_calibrated, stats = create_ar_model(history_years, ar_order=ar_p)
+                if ar_model_calibrated:
+                    market_model = ar_model_calibrated
+                    coeffs_str = ", ".join([f"{c:.2f}" for c in stats['ar_coeffs']])
+                    model_info_msg = (f"Calibrated AR({ar_p}) (Coeffs: [{coeffs_str}], "
+                                        f"Vol: {stats['volatility']:.1%}, "
+                                        f"Mean: {stats['mean_return']:.1%})")
+                else:
+                    st.error("AR model calibration failed. Falling back to Random Walk.")
+                    market_model = RandomWalkMarket(mu, residuals)
+                    model_info_msg = "Random Walk (AR model calibration failed)"
+                    
+            if market_model is None: # Fallback if model selection logic somehow fails
+                st.error("Failed to initialize market model. Defaulting to Random Walk.")
+                market_model = RandomWalkMarket(mu, residuals)
+                model_info_msg = "Random Walk (Default fallback)"
+
         except Exception as e:
-            st.error(f"Error fetching data: {e}")
+            st.error(f"Error initializing market model: {e}")
             st.stop()
 
-    # Display calibration info
-    if use_mean_reversion:
-        st.sidebar.success(f"Mean Reversion Model Calibrated")
-        st.sidebar.info(f"AR Order: {ar_order}")
-    else:
-        st.sidebar.success(f"Mean Return: {mu:.2%}")
-        st.sidebar.info(f"Samples: {len(residuals)} years")
+    # Display calibration info in sidebar
+    st.sidebar.success(f"Model Ready: {selected_model}")
+    if model_info_msg:
+        st.sidebar.info(model_info_msg)
 
     with st.spinner(f"Running {n_paths:,} simulations..."):
         sim_results = run_simulation(
@@ -183,10 +201,7 @@ if submitted or 'results' not in st.session_state:
             panic_threshold=panic_threshold,
             inflation_rate=inflation_rate,
             n_paths=n_paths,
-            mu=mu,
-            residuals=residuals,
-            use_ar_model=use_mean_reversion,
-            ar_model=mean_reversion_model,
+            market_model=market_model, # Pass the instantiated model object
             spending_cap_pct=spending_cap_pct,
             cash_interest_rate=cash_interest_rate
         )
@@ -209,7 +224,10 @@ if submitted or 'results' not in st.session_state:
             'annual_spend': annual_spend,
             'confidence': confidence,
             'history_years': history_years,
-            'cash_interest_rate': cash_interest_rate
+            'cash_interest_rate': cash_interest_rate,
+            'panic_threshold': panic_threshold, 
+            'buffer_years': buffer_years,
+            'inflation_rate': inflation_rate
         }
     }
 
