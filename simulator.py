@@ -74,11 +74,13 @@ class MeanRevertingMarket:
         self.intercept = None
         self.residual_std = None
         self.history_window = np.zeros(ar_order) 
+        self.full_history = None 
 
     def calibrate_from_history(self, historical_returns):
         # ... (keep existing implementation) ...
         # FIX: Ensure data is 1D flat array. yfinance sometimes returns (N, 1) which breaks matrix math.
         data = np.array(historical_returns).ravel()
+        self.full_history = data
         p = self.ar_order
         
         if len(data) < p + 10:
@@ -128,8 +130,21 @@ class MeanRevertingMarket:
             
         market_matrix = np.zeros((years, n_paths))
         
+        # Determine start window
+        # Default to the calibrated window (most recent)
+        start_window = self.history_window
+
+        # User request: Start from 4 years back from current year.
+        if self.full_history is not None:
+            p = self.ar_order
+            # We want the state at T-4.
+            # Indices: T=-1, ..., T-4=-5.
+            # We need p values ending at -5.
+            if len(self.full_history) >= p + 4:
+                start_window = self.full_history[-(p + 4) : -4][::-1]
+
         # Initialize windows: shape (n_paths, p)
-        current_history_windows = np.tile(self.history_window.reshape(1, -1), (n_paths, 1))
+        current_history_windows = np.tile(start_window.reshape(1, -1), (n_paths, 1))
         
         for t in range(years):
             # Simulate one step
@@ -144,17 +159,25 @@ class MeanRevertingMarket:
 
 @st.cache_data
 def get_sp500_data(history_years=60):
-    """Fetches S&P 500 Annual Returns."""
-    ticker = "^GSPC"
-    end_date = datetime.date.today()
-    start_date = end_date - datetime.timedelta(days=history_years * 365)
-    
+    """Fetches S&P 500 Annual Returns from local CSV (Total Return)."""
     try:
-        data = yf.download(ticker, start=start_date, end=end_date, progress=False, auto_adjust=True)
-        if len(data) < 250: return None
-        annual_returns = data['Close'].resample('YE').last().pct_change().dropna()
-        return annual_returns.values
-    except Exception:
+        # CSV format: Year, Return% (e.g., 2024, 25.02)
+        # Assume file is in the same directory or root
+        df = pd.read_csv("s_and_p_500_with_dividends.csv", header=None, names=["Year", "Return"])
+        
+        # Convert percent to decimal
+        df["Return"] = df["Return"] / 100.0
+        
+        # Sort by Year just in case
+        df = df.sort_values("Year")
+        
+        # Take the last 'history_years'
+        if len(df) > history_years:
+            df = df.tail(history_years)
+            
+        return df["Return"].values
+    except Exception as e:
+        st.error(f"Error loading S&P 500 data: {e}")
         return None
 
 def create_ar_model(history_years=50, ar_order=1):
