@@ -16,7 +16,27 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📈 Retirement Portfolio Simulator")
+st.markdown(
+    """
+    <style>
+        .title-row { display:flex; align-items:center; gap:8px; }
+        .tooltip { position:relative; display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:#f0f2f6; color:#0f1116; font-weight:600; cursor:help; }
+        .tooltip .tooltiptext { visibility:hidden; opacity:0; position:absolute; left:28px; top:50%; transform:translateY(-50%); background:#0f1116; color:white; padding:10px 12px; border-radius:8px; width:320px; box-shadow:0 8px 20px rgba(0,0,0,0.15); font-size:0.9rem; line-height:1.35; z-index:10; transition:opacity 0.15s ease; }
+        .tooltip .tooltiptext::after { content:""; position:absolute; left:-6px; top:50%; transform:translateY(-50%); border-width:6px; border-style:solid; border-color:transparent #0f1116 transparent transparent; }
+        .tooltip:hover .tooltiptext { visibility:visible; opacity:1; }
+    </style>
+    <div class="title-row">
+        <h1 style="margin:0;">📈 Retirement Portfolio Simulator</h1>
+        <div class="tooltip" aria-label="How this simulator works">
+            ℹ️
+            <div class="tooltiptext">
+                Models a retirement portfolio in real (inflation-adjusted) dollars using S&amp;P 500 total-return history. Configure net worth, annual spending, cash buffer and spending cap, panic threshold, inflation and cash rate, then pick Random Walk, Mean Reversion (AR), or Block Bootstrap to run Monte Carlo paths and visualize risk bands.
+            </div>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 st.caption("All monetary values are displayed in Today's Dollars (Real Purchasing Power).")
 st.markdown("""
 This tool uses statistical models to simulate future market behavior,
@@ -27,13 +47,14 @@ ensuring fat-tail events (2000, 2008) are represented in risk projections.
 st.sidebar.header("⚙️ Configuration")
 
 with st.sidebar.form("config_form"):
+    submitted = st.form_submit_button("🚀 Run Simulation", type="primary")
     
     with st.expander("Model Configuration", expanded=True):
         model_options = ["Random Walk", "Mean Reversion (AR-1)", "Mean Reversion (AR-2)", "Mean Reversion (AR-3)", "Mean Reversion (AR-4)", "Mean Reversion (AR-5)", "Block Bootstrap"]
         selected_model = st.selectbox(
             "Market Model",
             options=model_options,
-            index=model_options.index("Mean Reversion (AR-1)"), # Default to AR-1
+            index=model_options.index("Mean Reversion (AR-3)"), # Default to AR-3
             help="Select the statistical model for simulating market returns."
         )
         
@@ -54,7 +75,7 @@ with st.sidebar.form("config_form"):
             "Initial Net Worth ($)",
             min_value=100_000,
             max_value=50_000_000,
-            value=6_000_000,
+            value=2_000_000,
             step=100_000,
             format="%d"
         )
@@ -63,7 +84,7 @@ with st.sidebar.form("config_form"):
             "Annual Spending ($)",
             min_value=10_000,
             max_value=1_000_000,
-            value=250_000,
+            value=80_000,
             step=10_000,
             format="%d"
         )
@@ -130,9 +151,6 @@ with st.sidebar.form("config_form"):
             max_value=99,
             value=90
         ) / 100
-
-    # Submit Button within the form
-    submitted = st.form_submit_button("🚀 Run Simulation", type="primary")
 
 
 # Cache data fetching
