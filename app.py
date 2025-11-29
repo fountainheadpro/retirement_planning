@@ -55,7 +55,15 @@ with st.sidebar.form("config_form"):
             "Market Model",
             options=model_options,
             index=model_options.index("Mean Reversion (AR-3)"), # Default to AR-3
-            help="Select the statistical model for simulating market returns."
+            help="""
+Select the statistical model for simulating market returns:
+
+1. **Random Walk (Optimistic):** Assumes future returns are independent and follow the historical average distribution. Often ignores valuation risks (e.g., high P/E ratios) and assumes the "good times" will roll on average.
+
+2. **Mean Reversion (AR-n) (Pessimistic/Conservative):** Assumes that periods of high returns are followed by lower returns (and vice versa) to return to a long-term mean. This is generally more conservative when starting from high market valuations, as it predicts a "cooling off" period.
+
+3. **Block Bootstrap (Balanced/Realistic):** Resamples actual historical blocks of data (e.g., 5-year chunks). This preserves real-world market shocks (volatility clustering) and "fat tails" (crashes like 2000 or 2008) exactly as they happened, offering a realistic "what if history repeats" scenario.
+"""
         )
         
         block_size = 5 # Default value
