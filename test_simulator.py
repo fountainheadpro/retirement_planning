@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from simulator import run_simulation, calculate_statistics, _source_funds, MeanRevertingMarket, RandomWalkMarket, create_ar_model
+from simulator import run_simulation, calculate_statistics, _source_funds, MeanRevertingMarket, RandomWalkMarket, BlockBootstrapMarket, create_ar_model
 
 
 class TestSourceFunds:
@@ -498,76 +498,117 @@ class TestARSimulation:
 
 
 class TestDistributionAlignment:
-    """Test that simulation distribution aligns with historical data."""
+    """Test that simulation distribution aligns with historical data for various models."""
 
-    def test_simulation_aligns_with_history(self):
-        """
-        Split data into Train (50y) and Test (10y).
-        Fit model on Train.
-        Verify simulation matches Train distribution (sanity).
-        Verify Test data is within Simulation bounds (validity).
-        """
-        # 1. Load Data
+    @pytest.fixture
+    def sp500_data(self):
+        """Load and prepare S&P 500 data."""
         try:
-            # Assume file is in current directory
             df = pd.read_csv("s_and_p_500_with_dividends.csv", header=None, names=["Year", "Return"])
         except FileNotFoundError:
             pytest.skip("Data file not found")
-            return
+            return None
 
-        # Convert to decimal and sort
         df["Return"] = df["Return"] / 100.0
         df = df.sort_values("Year")
-
-        # 2. Split Data
-        # We need last 10 years for Test, and 50 years before that for Train.
-        # Ensure we have enough data
+        
         if len(df) < 60:
             pytest.skip(f"Not enough data: {len(df)} years available, need 60.")
-        
-        test_df = df.iloc[-10:]
-        train_df = df.iloc[-60:-10]
+            
+        return df
 
-        # 3. Fit Model
-        model = MeanRevertingMarket(ar_order=1)
-        # Use .values to ensure we pass a numpy array
-        model.calibrate_from_history(train_df["Return"].values)
-
-        # 4. Verify Generator (Simulation ~ Train)
-        # Simulate a long horizon to approximate the stationary distribution
-        # or many paths.
-        n_years_sim = 1000
-        n_paths_sim = 100
-        # Fix seed for reproducibility in unit test
+    def verify_model_fit(self, model, train_data, test_data, n_years_sim=1000, n_paths_sim=100, n_backtest_paths=2000):
+        """
+        Helper to verify model distribution against training data and 
+        backtest against test data.
+        """
+        # 1. Verify Generator (Simulation ~ Train)
+        # Fix seed for reproducibility
         np.random.seed(42)
         sim_matrix = model.simulate_matrix(years=n_years_sim, n_paths=n_paths_sim)
         flat_sim = sim_matrix.flatten()
 
-        train_mean = train_df["Return"].mean()
-        train_std = train_df["Return"].std()
+        train_mean = train_data.mean()
+        train_std = train_data.std()
         
         sim_mean = np.mean(flat_sim)
         sim_std = np.std(flat_sim)
 
-        # Check moments 
-        # AR(1) long term mean = intercept / (1 - phi)
-        # Sample mean should be close to Training mean.
-        # Using 0.025 (2.5%) tolerance for mean and std dev differences
-        assert abs(sim_mean - train_mean) < 0.025, f"Sim Mean {sim_mean:.3f} != Train Mean {train_mean:.3f}"
-        assert abs(sim_std - train_std) < 0.025, f"Sim Std {sim_std:.3f} != Train Std {train_std:.3f}"
+        # Check moments (Mean and Std Dev)
+        # Using 0.025 (2.5%) tolerance
+        assert abs(sim_mean - train_mean) < 0.025, \
+            f"Sim Mean {sim_mean:.3f} != Train Mean {train_mean:.3f} (Diff: {sim_mean-train_mean:.3f})"
+        assert abs(sim_std - train_std) < 0.025, \
+            f"Sim Std {sim_std:.3f} != Train Std {train_std:.3f} (Diff: {sim_std-train_std:.3f})"
 
-        # 5. Verify Backtest (Test ~ Simulation)
-        # Simulate the specific 10-year period (many times) to create a cone of possibility
-        sim_10y = model.simulate_matrix(years=10, n_paths=2000)
+        # 2. Verify Backtest (Test ~ Simulation)
+        # Simulate the specific test period length
+        test_len = len(test_data)
+        sim_test_period = model.simulate_matrix(years=test_len, n_paths=n_backtest_paths)
         
-        # Compare Mean Return of the 10-year period
-        sim_10y_means = np.mean(sim_10y, axis=0)
-        actual_10y_mean = test_df["Return"].mean()
+        # Compare Mean Return of the test period
+        sim_period_means = np.mean(sim_test_period, axis=0)
+        actual_period_mean = test_data.mean()
 
         # Check if actual is within 0.5th and 99.5th percentile (wide confidence)
-        lower_bound = np.percentile(sim_10y_means, 0.5)
-        upper_bound = np.percentile(sim_10y_means, 99.5)
+        lower_bound = np.percentile(sim_period_means, 0.5)
+        upper_bound = np.percentile(sim_period_means, 99.5)
 
-        assert lower_bound < actual_10y_mean < upper_bound, \
-            f"Actual 10y Mean {actual_10y_mean:.3f} outside Sim bounds [{lower_bound:.3f}, {upper_bound:.3f}]"
+        assert lower_bound < actual_period_mean < upper_bound, \
+            f"Actual Mean {actual_period_mean:.3f} outside Sim bounds [{lower_bound:.3f}, {upper_bound:.3f}]"
+
+    def test_ar1_alignment(self, sp500_data):
+        """Test MeanRevertingMarket with AR(1)."""
+        if sp500_data is None: return
+
+        test_df = sp500_data.iloc[-10:]
+        train_df = sp500_data.iloc[-60:-10]
+        train_values = train_df["Return"].values
+
+        model = MeanRevertingMarket(ar_order=1)
+        model.calibrate_from_history(train_values)
+        
+        self.verify_model_fit(model, train_df["Return"], test_df["Return"])
+
+    def test_ar2_alignment(self, sp500_data):
+        """Test MeanRevertingMarket with AR(2)."""
+        if sp500_data is None: return
+
+        test_df = sp500_data.iloc[-10:]
+        train_df = sp500_data.iloc[-60:-10]
+        train_values = train_df["Return"].values
+
+        model = MeanRevertingMarket(ar_order=2)
+        model.calibrate_from_history(train_values)
+        
+        self.verify_model_fit(model, train_df["Return"], test_df["Return"])
+
+    def test_random_walk_alignment(self, sp500_data):
+        """Test RandomWalkMarket."""
+        if sp500_data is None: return
+
+        test_df = sp500_data.iloc[-10:]
+        train_df = sp500_data.iloc[-60:-10]
+        train_values = train_df["Return"].values
+
+        # Manually calculate mu and residuals for initialization
+        mu = np.mean(train_values)
+        residuals = train_values - mu
+        
+        model = RandomWalkMarket(mu=mu, residuals=residuals)
+        
+        self.verify_model_fit(model, train_df["Return"], test_df["Return"])
+
+    def test_block_bootstrap_alignment(self, sp500_data):
+        """Test BlockBootstrapMarket."""
+        if sp500_data is None: return
+
+        test_df = sp500_data.iloc[-10:]
+        train_df = sp500_data.iloc[-60:-10]
+        train_values = train_df["Return"].values
+
+        # BlockBootstrap re-samples from history directly
+        model = BlockBootstrapMarket(history_returns=train_values, block_size=5)
+        
+        self.verify_model_fit(model, train_df["Return"], test_df["Return"])
 
