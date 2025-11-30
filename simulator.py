@@ -134,14 +134,11 @@ class MeanRevertingMarket:
         # Default to the calibrated window (most recent)
         start_window = self.history_window
 
-        # User request: Start from 4 years back from current year.
+        # User request: Use the final 'p' values from full history (most recent data)
         if self.full_history is not None:
             p = self.ar_order
-            # We want the state at T-4.
-            # Indices: T=-1, ..., T-4=-5.
-            # We need p values ending at -5.
-            if len(self.full_history) >= p + 4:
-                start_window = self.full_history[-(p + 4) : -4][::-1]
+            if len(self.full_history) >= p:
+                start_window = self.full_history[-p:][::-1]
 
         # Initialize windows: shape (n_paths, p)
         current_history_windows = np.tile(start_window.reshape(1, -1), (n_paths, 1))
