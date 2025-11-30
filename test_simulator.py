@@ -236,6 +236,34 @@ class TestRunSimulation:
         # Year 0: 1M, Year 1: ~950k (after 50k withdrawal from equity)
         assert portfolio[1, 0] < 1_000_000
 
+    def test_drawdown_prefers_cash_even_without_panic(self):
+        """Drawdown years should source withdrawals from cash first."""
+
+        class DummyMarket:
+            def simulate_matrix(self, years, n_paths):
+                # Single-year -20% return to force a drawdown
+                return np.full((years, n_paths), -0.20)
+
+        model = DummyMarket()
+
+        results = run_simulation(
+            initial_net_worth=100_000,
+            annual_spend=10_000,
+            buffer_years=1,  # 10k cash set aside initially
+            years=1,
+            panic_threshold=-0.50,  # Panic not triggered by -20%
+            inflation_rate=0.0,
+            n_paths=1,
+            market_model=model,
+        )
+
+        from_cash = results["withdrawals_from_cash"][0, 0]
+        from_equity = results["withdrawals_from_equity"][0, 0]
+
+        # Spending cap limits withdrawal to 4% of ~80k-90k assets (~3.2k-3.6k)
+        assert from_cash > 0
+        assert from_equity == 0
+
 
 class TestCalculateStatistics:
     """Test statistical calculations."""
