@@ -583,6 +583,45 @@ class TestDistributionAlignment:
         
         self.verify_model_fit(model, train_df["Return"], test_df["Return"])
 
+    def test_ar3_alignment(self, sp500_data):
+        """Test MeanRevertingMarket with AR(3)."""
+        if sp500_data is None: return
+
+        test_df = sp500_data.iloc[-10:]
+        train_df = sp500_data.iloc[-60:-10]
+        train_values = train_df["Return"].values
+
+        model = MeanRevertingMarket(ar_order=3)
+        model.calibrate_from_history(train_values)
+        
+        self.verify_model_fit(model, train_df["Return"], test_df["Return"])
+
+    def test_ar4_alignment(self, sp500_data):
+        """Test MeanRevertingMarket with AR(4)."""
+        if sp500_data is None: return
+
+        test_df = sp500_data.iloc[-10:]
+        train_df = sp500_data.iloc[-60:-10]
+        train_values = train_df["Return"].values
+
+        model = MeanRevertingMarket(ar_order=4)
+        model.calibrate_from_history(train_values)
+        
+        self.verify_model_fit(model, train_df["Return"], test_df["Return"])
+
+    def test_ar5_alignment(self, sp500_data):
+        """Test MeanRevertingMarket with AR(5)."""
+        if sp500_data is None: return
+
+        test_df = sp500_data.iloc[-10:]
+        train_df = sp500_data.iloc[-60:-10]
+        train_values = train_df["Return"].values
+
+        model = MeanRevertingMarket(ar_order=5)
+        model.calibrate_from_history(train_values)
+        
+        self.verify_model_fit(model, train_df["Return"], test_df["Return"])
+
     def test_random_walk_alignment(self, sp500_data):
         """Test RandomWalkMarket."""
         if sp500_data is None: return
