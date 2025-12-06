@@ -48,7 +48,7 @@ class TestSourceFunds:
         """When equity depleted, should use cash."""
         result = _source_funds(
             desired=100_000,
-            market_return=0.05,
+            market_return=0.05,  # Positive return
             panic_threshold=-0.15,
             equity=0,
             cash=200_000
@@ -679,3 +679,150 @@ class TestDistributionAlignment:
         
         self.verify_model_fit(model, train_df["Return"], test_df["Return"])
 
+
+# New Strategies Tests
+
+class MockMarket:
+    def __init__(self, returns):
+        self.returns = np.array(returns)
+        
+    def simulate_matrix(self, years, n_paths):
+        # Tile the returns to match shape (years, n_paths)
+        # If returns is 1D array of length 'years', use it.
+        # If single value, repeat it.
+        if self.returns.ndim == 1 and len(self.returns) == years:
+             return np.tile(self.returns[:, np.newaxis], (1, n_paths))
+        elif self.returns.ndim == 1 and len(self.returns) == 1:
+             return np.full((years, n_paths), self.returns[0])
+        return self.returns
+
+class TestStrategies:
+    
+    def test_aggressive_buy_dip(self):
+        """
+        Test 'Aggressive' strategy:
+        - Panic market (-20%)
+        - Initial Cash > 0
+        - Expect: Cash moved to Equity, Withdrawal from Equity
+        """
+        # Market drops 20% in year 1
+        market = MockMarket([-0.20])
+        
+        initial_nw = 1_000_000
+        buffer_years = 2
+        spend = 50_000
+        
+        results = run_simulation(
+            initial_net_worth=initial_nw,
+            annual_spend=spend,
+            buffer_years=buffer_years, # Should result in 100k cash
+            years=1,
+            panic_threshold=-0.15,
+            inflation_rate=0.0,
+            n_paths=1,
+            market_model=market,
+            strategy="Aggressive",
+            spending_cap_pct=1.0 # Disable cap for test math
+        )
+        
+        # Check Initial Allocation (Before Loop)
+        # run_simulation doesn't return initial state, but Year 0 in arrays
+        # Year 0:
+        # Cash = 100k, Equity = 900k
+        assert results['cash_values'][0,0] == 100_000
+        assert results['equity_values'][0,0] == 900_000
+        
+        # Year 1 Logic:
+        # 1. Market Return: Equity 900k * 0.8 = 720k
+        # 2. Panic (-20% < -15%) & Has Cash (100k) -> Buy Mask True
+        # 3. Move Cash -> Equity: Equity = 720k + 100k = 820k, Cash = 0
+        # 4. Withdrawal: 50k from Equity (Cash is 0)
+        # Final Equity = 820k - 50k = 770k
+        # Final Cash = 0
+        
+        final_equity = results['equity_values'][1,0]
+        final_cash = results['cash_values'][1,0]
+        
+        assert final_cash == 0.0
+        # Allow small float tolerance
+        assert abs(final_equity - 770_000) < 1.0
+        
+        # Verify withdrawals came from equity
+        assert results['withdrawals_from_cash'][0,0] == 0
+        assert results['withdrawals_from_equity'][0,0] == 50_000
+
+    def test_no_cash_buffer_strategy(self):
+        """
+        Test 'No Cash Buffer' strategy:
+        - Even if buffer_years > 0 passed, cash should be 0.
+        - Withdrawals always from equity.
+        """
+        market = MockMarket([0.10]) # +10% return
+        
+        initial_nw = 1_000_000
+        buffer_years = 5 # Request 5 years buffer
+        spend = 50_000
+        
+        results = run_simulation(
+            initial_net_worth=initial_nw,
+            annual_spend=spend,
+            buffer_years=buffer_years,
+            years=1,
+            panic_threshold=-0.15,
+            inflation_rate=0.0,
+            n_paths=1,
+            market_model=market,
+            strategy="No Cash Buffer",
+            spending_cap_pct=1.0
+        )
+        
+        # Check Initial Allocation
+        # Should force buffer to 0
+        assert results['cash_values'][0,0] == 0.0
+        assert results['equity_values'][0,0] == 1_000_000
+        
+        # Year 1 Logic:
+        # Equity 1M * 1.1 = 1.1M
+        # Withdrawal 50k from Equity
+        # Final 1.05M
+        
+        final_equity = results['equity_values'][1,0]
+        assert abs(final_equity - 1_050_000) < 1.0
+        assert results['cash_values'][1,0] == 0.0
+
+    def test_conservative_strategy(self):
+        """
+        Test 'Conservative' (Default) strategy behavior explicitly.
+        - Panic market
+        - Use Cash for withdrawal
+        """
+        market = MockMarket([-0.20])
+        initial_nw = 1_000_000
+        spend = 50_000
+        
+        results = run_simulation(
+            initial_net_worth=initial_nw,
+            annual_spend=spend,
+            buffer_years=2, # 100k cash
+            years=1,
+            panic_threshold=-0.15,
+            inflation_rate=0.0,
+            n_paths=1,
+            market_model=market,
+            strategy="Conservative",
+            spending_cap_pct=1.0
+        )
+        
+        # Year 1:
+        # Equity 900k * 0.8 = 720k
+        # Panic -> Use Cash
+        # Withdraw 50k from Cash (100k -> 50k)
+        # Final Equity = 720k
+        # Final Cash = 50k
+        
+        final_equity = results['equity_values'][1,0]
+        final_cash = results['cash_values'][1,0]
+        
+        assert abs(final_equity - 720_000) < 1.0
+        assert abs(final_cash - 50_000) < 1.0
+        assert results['withdrawals_from_cash'][0,0] == 50_000

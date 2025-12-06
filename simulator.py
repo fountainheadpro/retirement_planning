@@ -216,7 +216,8 @@ def run_simulation(
     panic_threshold, inflation_rate, n_paths,
     market_model,
     spending_cap_pct=0.04,
-    cash_interest_rate=None
+    cash_interest_rate=None,
+    strategy="Conservative"
 ):
     # Default cash interest to inflation if not specified (Real return = 0%)
     if cash_interest_rate is None:
@@ -227,6 +228,10 @@ def run_simulation(
     market_returns_matrix = market_model.simulate_matrix(years, n_paths)
 
     # Initial Allocation
+    # Strategy Override: No Cash Buffer
+    if strategy == "No Cash Buffer":
+        buffer_years = 0
+        
     initial_cash_target = annual_spend * buffer_years
     initial_cash = min(initial_cash_target, initial_net_worth)
     initial_equity = initial_net_worth - initial_cash
@@ -279,69 +284,82 @@ def run_simulation(
         current_equity = np.maximum(0.0, current_equity * (1 + real_market_return))
         current_cash = np.maximum(0.0, current_cash * (1 + real_cash_return))
         
-        # 3. Withdrawals (Real Terms)
-        # Annual spend is constant in real terms
-        target_spend_real = annual_spend
+        # 3. Strategy Execution
         
-        total_liquid_assets = current_equity + current_cash 
-        
-        # Spending Cap (Solvency based) - 4% of current portfolio value (Real)
-        desired_withdrawal = np.minimum(target_spend_real, total_liquid_assets * spending_cap_pct)
-        
-        # Smart Hedged Logic (Panic vs Normal) - Vectorized
+        # Common Signals
         # Panic is triggered by NOMINAL drops (psychological) **or** when the
-        # market remains below its prior high-water mark (drawdown). This keeps
-        # withdrawals from equity muted until prices recover.
+        # market remains below its prior high-water mark (drawdown).
         panic_mask = (market_return_nominal < panic_threshold) | (market_index < (market_peak * 0.999))
         panic_flags[t-1, :] = panic_mask
         
-        has_cash_mask = current_cash > 0
+        # Annual Spend (Real)
+        target_spend_real = annual_spend
+        total_liquid_assets = current_equity + current_cash 
+        desired_withdrawal = np.minimum(target_spend_real, total_liquid_assets * spending_cap_pct)
         
-        # Allocation Arrays
+        # Initialize withdrawal tracking for this step
         from_cash = np.zeros(n_paths).astype(float)
         from_equity = np.zeros(n_paths).astype(float)
+
+        # --- STRATEGY LOGIC ---
         
-        # CASE 1: Panic & Has Cash -> Use Cash First
-        mask1 = panic_mask & has_cash_mask
-        if np.any(mask1):
-            from_cash[mask1] = np.minimum(desired_withdrawal[mask1], current_cash[mask1])
-            from_equity[mask1] = desired_withdrawal[mask1] - from_cash[mask1]
+        if strategy == "Aggressive":
+            # STRATEGY: Buy The Dip
+            # 1. Investment: If Panic, move ALL Cash -> Equity
+            buy_mask = panic_mask & (current_cash > 0)
+            if np.any(buy_mask):
+                to_buy = current_cash[buy_mask]
+                current_equity[buy_mask] += to_buy
+                current_cash[buy_mask] -= to_buy
             
-        # CASE 2: Normal OR No Cash -> Use Equity First
-        mask2 = ~mask1
-        if np.any(mask2):
-            from_equity[mask2] = np.minimum(desired_withdrawal[mask2], current_equity[mask2])
-            from_cash[mask2] = desired_withdrawal[mask2] - from_equity[mask2]
+            # 2. Spending: Equity First (since we prioritize being invested)
+            # Note: If we just bought the dip, cash is 0, so we must sell equity.
+            from_equity = np.minimum(desired_withdrawal, current_equity)
+            from_cash = desired_withdrawal - from_equity # Remainder from cash
             
-        # Update Balances
+        elif strategy == "No Cash Buffer":
+            # STRATEGY: Fully Invested
+            # Always Equity First (Cash should be 0)
+            from_equity = np.minimum(desired_withdrawal, current_equity)
+            from_cash = desired_withdrawal - from_equity
+            
+        else: 
+            # STRATEGY: Conservative (Default)
+            # 1. Spending: Cash First if Panic
+            has_cash_mask = current_cash > 0
+            mask1 = panic_mask & has_cash_mask
+            
+            # Panic & Has Cash -> Use Cash
+            if np.any(mask1):
+                from_cash[mask1] = np.minimum(desired_withdrawal[mask1], current_cash[mask1])
+                from_equity[mask1] = desired_withdrawal[mask1] - from_cash[mask1]
+                
+            # Normal OR No Cash -> Use Equity
+            mask2 = ~mask1
+            if np.any(mask2):
+                from_equity[mask2] = np.minimum(desired_withdrawal[mask2], current_equity[mask2])
+                from_cash[mask2] = desired_withdrawal[mask2] - from_equity[mask2]
+
+        # --- EXECUTE WITHDRAWALS ---
         current_cash -= from_cash
         current_equity -= from_equity
         
-        # Store withdrawal details
         withdrawals_from_cash[t-1, :] = from_cash
         withdrawals_from_equity[t-1, :] = from_equity
         withdrawals[t-1, :] = from_cash + from_equity
         
-        # 4. Cash Buffer Replenishment
-        # Rule: Only replenish if we are at or above the Market High Water Mark (Recovery)
-        # This prevents selling equity during a drawdown to fill cash.
+        # --- REPLENISHMENT (Common for strategies with buffer) ---
+        # No Cash Buffer strategy effectively has target=0, so this is no-op
         
         target_cash_level = target_spend_real * buffer_years
         
-        # Identify paths that:
-        # 1. Are at High Water Mark (market_index >= market_peak)
-        # 2. Have less cash than target
-        # Note: We use a small epsilon tolerance for float comparison
+        # Rule: Only replenish if we are at or above the Market High Water Mark
         at_peak_mask = market_index >= (market_peak * 0.999)
         replenish_mask = at_peak_mask & (current_cash < target_cash_level)
         
         if np.any(replenish_mask):
-            # Calculate shortfall
             shortfall = target_cash_level - current_cash[replenish_mask]
-            
-            # Move funds from equity to cash, capped by available equity
             to_transfer = np.minimum(shortfall, current_equity[replenish_mask])
-            
             current_cash[replenish_mask] += to_transfer
             current_equity[replenish_mask] -= to_transfer
             replenishments[t-1, replenish_mask] = to_transfer
