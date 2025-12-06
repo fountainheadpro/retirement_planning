@@ -3,6 +3,7 @@ import plotly.graph_objects as go
 import numpy as np
 
 from simulator import get_sp500_residuals, run_simulation, calculate_statistics, create_ar_model, RandomWalkMarket, BlockBootstrapMarket, MeanRevertingMarket
+from strategies import ConservativeStrategy, AggressiveStrategy, NoCashBufferStrategy
 
 def ordinal(n):
     """Return number with ordinal suffix (1st, 2nd, 3rd, 4th)."""
@@ -97,22 +98,53 @@ Select the statistical model for simulating market returns:
             format="%d"
         )
 
-        buffer_years = st.slider(
-            "Cash Buffer (Years)",
-            min_value=0,
-            max_value=5,
-            value=2,
-            help="Years of expenses to keep in cash buffer"
+        # Strategy Selector
+        strategy_display = st.selectbox(
+            "Cash Strategy",
+            options=[
+                "Conservative (Protect Withdrawals)", 
+                "Aggressive (Buy the Dip)", 
+                "Fully Invested (No Cash Buffer)"
+            ],
+            index=0,
+            help="""
+**Conservative:** Uses cash buffer to fund withdrawals during market downturns (Panic/Drawdown) to avoid selling equity at a loss. Replenishes cash only when market recovers (High Water Mark).
+
+**Aggressive (Buy the Dip):** Uses cash buffer to BUY equity during market downturns. Withdrawals come from Equity. Replenishes cash when market recovers.
+
+**Fully Invested:** Holds 0% cash. All funds in equity. Withdrawals always sold from equity.
+"""
         )
         
-        cash_interest_rate = st.slider(
-            "Cash Interest Rate (%)",
-            min_value=0.0,
-            max_value=10.0,
-            value=3.0,
-            step=0.5,
-            help="Nominal interest rate earned on cash buffer. Defaults to matching inflation if not set."
-        ) / 100
+        # Map display name to internal name
+        strategy_map = {
+            "Conservative (Protect Withdrawals)": "Conservative",
+            "Aggressive (Buy the Dip)": "Aggressive",
+            "Fully Invested (No Cash Buffer)": "No Cash Buffer"
+        }
+        selected_strategy = strategy_map[strategy_display]
+
+        # Conditional Inputs
+        if selected_strategy != "No Cash Buffer":
+            buffer_years = st.slider(
+                "Cash Buffer (Years)",
+                min_value=0,
+                max_value=5,
+                value=2,
+                help="Years of expenses to keep in cash buffer"
+            )
+            
+            cash_interest_rate = st.slider(
+                "Cash Interest Rate (%)",
+                min_value=0.0,
+                max_value=10.0,
+                value=3.0,
+                step=0.5,
+                help="Nominal interest rate earned on cash buffer. Defaults to matching inflation if not set."
+            ) / 100
+        else:
+            buffer_years = 0
+            cash_interest_rate = 0.0
 
         spending_cap_pct = st.slider(
             "Spending Cap (% of Portfolio)",
@@ -209,6 +241,17 @@ if submitted or 'results' not in st.session_state:
                 market_model = RandomWalkMarket(mu, residuals)
                 model_info_msg = "Random Walk (Default fallback)"
 
+            # Instantiate Strategy Object
+            strategy_obj = None
+            if selected_strategy == "Conservative":
+                strategy_obj = ConservativeStrategy()
+            elif selected_strategy == "Aggressive":
+                strategy_obj = AggressiveStrategy()
+            elif selected_strategy == "No Cash Buffer":
+                strategy_obj = NoCashBufferStrategy()
+            else:
+                strategy_obj = ConservativeStrategy()
+
         except Exception as e:
             st.error(f"Error initializing market model: {e}")
             st.stop()
@@ -229,7 +272,8 @@ if submitted or 'results' not in st.session_state:
             n_paths=n_paths,
             market_model=market_model, # Pass the instantiated model object
             spending_cap_pct=spending_cap_pct,
-            cash_interest_rate=cash_interest_rate
+            cash_interest_rate=cash_interest_rate,
+            strategy=strategy_obj
         )
         # Use REAL (Inflation-Adjusted) values for all visualizations
         portfolio_vals = sim_results['portfolio_values']
@@ -253,7 +297,8 @@ if submitted or 'results' not in st.session_state:
             'cash_interest_rate': cash_interest_rate,
             'panic_threshold': panic_threshold, 
             'buffer_years': buffer_years,
-            'inflation_rate': inflation_rate
+            'inflation_rate': inflation_rate,
+            'strategy': selected_strategy # Store string name for display logic
         }
     }
 
@@ -449,14 +494,38 @@ if 'results' in st.session_state:
     # Use variables directly from widgets to avoid KeyError on first run/stale state
     real_cash_return_for_display = (1 + cash_interest_rate) / (1 + inflation_rate) - 1
 
+    # Dynamic Description based on Strategy
+    strat_desc = ""
+    active_strat = params.get('strategy', 'Conservative') # Default to conservative if missing
+    
+    if active_strat == "Conservative":
+        strat_desc = f"""
+**Strategy: Conservative**
+-   **Target:** A cash buffer is maintained at {buffer_years} years of annual spending.
+-   **Withdrawals:** During normal market conditions, withdrawals come primarily from equity. If the market experiences a significant drop (return below {panic_threshold:.0%}) or if the overall market is in a drawdown, withdrawals will prioritize using cash from the buffer.
+-   **Replenishment:** The cash buffer is only replenished from equity when the overall market has recovered to its previous peak (High Water Mark).
+"""
+    elif active_strat == "Aggressive":
+        strat_desc = f"""
+**Strategy: Aggressive (Buy the Dip)**
+-   **Target:** A cash buffer is maintained at {buffer_years} years of annual spending.
+-   **Investment:** When the market experiences a significant drop (Panic/Drawdown), available cash is **moved into equity** to buy the dip.
+-   **Withdrawals:** Withdrawals are taken from Equity (maximizing time in market/exposure).
+-   **Replenishment:** The cash buffer is replenished from equity only when the market recovers to its previous peak.
+"""
+    elif active_strat == "No Cash Buffer":
+        strat_desc = """
+**Strategy: Fully Invested**
+-   **Target:** No cash buffer. 100% Equity allocation.
+-   **Withdrawals:** All withdrawals come from selling equity, regardless of market conditions.
+"""
+
     st.subheader("📊 Asset Allocation (Risk Scenario) - Real Dollars", help=f"""
 This chart shows the composition of your portfolio for a specific "risk scenario" path, selected as the closest trajectory to the {ordinal(risk_percentile_val)} percentile outcome from the Portfolio Projection.
 
-**Cash Buffer Management:**
--   **Target:** A cash buffer is maintained at {buffer_years} years of annual spending.
--   **Withdrawals:** During normal market conditions, withdrawals come primarily from equity. If the market experiences a significant drop (return below {panic_threshold:.0%}) or if the overall market is in a drawdown, withdrawals will prioritize using cash from the buffer.
--   **Replenishment:** The cash buffer is only replenished from equity when the overall market has recovered to its previous peak (High Water Mark). This strategy avoids selling equities at a loss to refill cash during drawdowns.
--   **Cash Growth:** Cash in the buffer grows at the nominal interest rate of {cash_interest_rate:.1%} (equivalent to {real_cash_return_for_display:.1%} real return given {inflation_rate:.1%} inflation). This aims to prevent it from losing purchasing power if `cash_interest_rate` matches `inflation_rate`.
+{strat_desc}
+
+**Cash Growth:** Cash in the buffer grows at the nominal interest rate of {cash_interest_rate:.1%} (equivalent to {real_cash_return_for_display:.1%} real return given {inflation_rate:.1%} inflation).
 """)
     
     # Improved Risk Path Selection: Nearest Neighbor to the Risk Boundary Curve
