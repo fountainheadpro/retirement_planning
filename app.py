@@ -3,6 +3,7 @@ import plotly.graph_objects as go
 import numpy as np
 
 from simulator import get_sp500_residuals, run_simulation, calculate_statistics, create_ar_model, RandomWalkMarket, BlockBootstrapMarket, MeanRevertingMarket
+from strategies import ConservativeStrategy, AggressiveStrategy, NoCashBufferStrategy
 
 def ordinal(n):
     """Return number with ordinal suffix (1st, 2nd, 3rd, 4th)."""
@@ -240,6 +241,17 @@ if submitted or 'results' not in st.session_state:
                 market_model = RandomWalkMarket(mu, residuals)
                 model_info_msg = "Random Walk (Default fallback)"
 
+            # Instantiate Strategy Object
+            strategy_obj = None
+            if selected_strategy == "Conservative":
+                strategy_obj = ConservativeStrategy()
+            elif selected_strategy == "Aggressive":
+                strategy_obj = AggressiveStrategy()
+            elif selected_strategy == "No Cash Buffer":
+                strategy_obj = NoCashBufferStrategy()
+            else:
+                strategy_obj = ConservativeStrategy()
+
         except Exception as e:
             st.error(f"Error initializing market model: {e}")
             st.stop()
@@ -261,7 +273,7 @@ if submitted or 'results' not in st.session_state:
             market_model=market_model, # Pass the instantiated model object
             spending_cap_pct=spending_cap_pct,
             cash_interest_rate=cash_interest_rate,
-            strategy=selected_strategy
+            strategy=strategy_obj
         )
         # Use REAL (Inflation-Adjusted) values for all visualizations
         portfolio_vals = sim_results['portfolio_values']
@@ -286,7 +298,7 @@ if submitted or 'results' not in st.session_state:
             'panic_threshold': panic_threshold, 
             'buffer_years': buffer_years,
             'inflation_rate': inflation_rate,
-            'strategy': selected_strategy
+            'strategy': selected_strategy # Store string name for display logic
         }
     }
 

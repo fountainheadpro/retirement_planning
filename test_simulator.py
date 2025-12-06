@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from simulator import run_simulation, calculate_statistics, _source_funds, MeanRevertingMarket, RandomWalkMarket, BlockBootstrapMarket, create_ar_model
-
+from strategies import ConservativeStrategy, AggressiveStrategy, NoCashBufferStrategy
 
 class TestSourceFunds:
     """Test the fund sourcing logic."""
@@ -721,7 +721,7 @@ class TestStrategies:
             inflation_rate=0.0,
             n_paths=1,
             market_model=market,
-            strategy="Aggressive",
+            strategy=AggressiveStrategy(),
             spending_cap_pct=1.0 # Disable cap for test math
         )
         
@@ -760,7 +760,8 @@ class TestStrategies:
         market = MockMarket([0.10]) # +10% return
         
         initial_nw = 1_000_000
-        buffer_years = 5 # Request 5 years buffer
+        # Caller responsibility: buffer_years must be 0 for this strategy
+        buffer_years = 0 
         spend = 50_000
         
         results = run_simulation(
@@ -772,7 +773,7 @@ class TestStrategies:
             inflation_rate=0.0,
             n_paths=1,
             market_model=market,
-            strategy="No Cash Buffer",
+            strategy=NoCashBufferStrategy(),
             spending_cap_pct=1.0
         )
         
@@ -809,7 +810,7 @@ class TestStrategies:
             inflation_rate=0.0,
             n_paths=1,
             market_model=market,
-            strategy="Conservative",
+            strategy=ConservativeStrategy(),
             spending_cap_pct=1.0
         )
         

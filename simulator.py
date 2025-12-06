@@ -207,6 +207,8 @@ def get_sp500_residuals(history_years):
     residuals = hist - mu
     return mu, residuals, hist
 
+from strategies import CashStrategy, ConservativeStrategy, StrategyContext
+
 # ==========================================
 # 2. SIMULATION ENGINE
 # ==========================================
@@ -217,8 +219,12 @@ def run_simulation(
     market_model,
     spending_cap_pct=0.04,
     cash_interest_rate=None,
-    strategy="Conservative"
+    strategy: CashStrategy = None
 ):
+    # Default strategy
+    if strategy is None:
+        strategy = ConservativeStrategy()
+
     # Default cash interest to inflation if not specified (Real return = 0%)
     if cash_interest_rate is None:
         cash_interest_rate = inflation_rate
@@ -228,9 +234,9 @@ def run_simulation(
     market_returns_matrix = market_model.simulate_matrix(years, n_paths)
 
     # Initial Allocation
-    # Strategy Override: No Cash Buffer
-    if strategy == "No Cash Buffer":
-        buffer_years = 0
+    # Note: Strategy-specific overrides (like No Buffer forcing 0) should be handled
+    # by the caller (app.py) setting buffer_years=0, or we could ask strategy,
+    # but keeping it simple: Caller configures buffer_years appropriately.
         
     initial_cash_target = annual_spend * buffer_years
     initial_cash = min(initial_cash_target, initial_net_worth)
@@ -287,8 +293,6 @@ def run_simulation(
         # 3. Strategy Execution
         
         # Common Signals
-        # Panic is triggered by NOMINAL drops (psychological) **or** when the
-        # market remains below its prior high-water mark (drawdown).
         panic_mask = (market_return_nominal < panic_threshold) | (market_index < (market_peak * 0.999))
         panic_flags[t-1, :] = panic_mask
         
@@ -296,49 +300,61 @@ def run_simulation(
         target_spend_real = annual_spend
         total_liquid_assets = current_equity + current_cash 
         desired_withdrawal = np.minimum(target_spend_real, total_liquid_assets * spending_cap_pct)
-        
-        # Initialize withdrawal tracking for this step
-        from_cash = np.zeros(n_paths).astype(float)
-        from_equity = np.zeros(n_paths).astype(float)
+        target_cash_level = target_spend_real * buffer_years
 
-        # --- STRATEGY LOGIC ---
+        # Create Context
+        ctx = StrategyContext(
+            current_cash=current_cash,
+            current_equity=current_equity,
+            panic_mask=panic_mask,
+            desired_withdrawal=desired_withdrawal, # Not used in pre-rebalance but useful
+            market_index=market_index,
+            market_peak=market_peak,
+            target_cash_level=target_cash_level
+        )
+
+        # A. Pre-Withdrawal Rebalance (e.g. Buy Dip)
+        # Returns: Positive = Equity->Cash, Negative = Cash->Equity
+        pre_transfer = strategy.pre_withdrawal_rebalance(ctx)
         
-        if strategy == "Aggressive":
-            # STRATEGY: Buy The Dip
-            # 1. Investment: If Panic, move ALL Cash -> Equity
-            buy_mask = panic_mask & (current_cash > 0)
-            if np.any(buy_mask):
-                to_buy = current_cash[buy_mask]
-                current_equity[buy_mask] += to_buy
-                current_cash[buy_mask] -= to_buy
+        # Apply Pre-Transfer
+        # Ensure we don't transfer more than available
+        # If negative (Cash->Equity), capped by available cash
+        # If positive (Equity->Cash), capped by available equity
+        
+        # Logic to safely apply transfer:
+        # 1. Separate into Cash->Equity (negative) and Equity->Cash (positive)
+        to_equity_mask = pre_transfer < 0
+        to_cash_mask = pre_transfer > 0
+        
+        realized_transfer = np.zeros_like(pre_transfer)
+        
+        if np.any(to_equity_mask):
+            # Want to move X from Cash to Equity. Max is current_cash.
+            # pre_transfer is negative, so use abs or negate
+            amount = -pre_transfer[to_equity_mask]
+            available = current_cash[to_equity_mask]
+            actual = np.minimum(amount, available)
+            realized_transfer[to_equity_mask] = -actual # Keep sign
             
-            # 2. Spending: Equity First (since we prioritize being invested)
-            # Note: If we just bought the dip, cash is 0, so we must sell equity.
-            from_equity = np.minimum(desired_withdrawal, current_equity)
-            from_cash = desired_withdrawal - from_equity # Remainder from cash
-            
-        elif strategy == "No Cash Buffer":
-            # STRATEGY: Fully Invested
-            # Always Equity First (Cash should be 0)
-            from_equity = np.minimum(desired_withdrawal, current_equity)
-            from_cash = desired_withdrawal - from_equity
-            
-        else: 
-            # STRATEGY: Conservative (Default)
-            # 1. Spending: Cash First if Panic
-            has_cash_mask = current_cash > 0
-            mask1 = panic_mask & has_cash_mask
-            
-            # Panic & Has Cash -> Use Cash
-            if np.any(mask1):
-                from_cash[mask1] = np.minimum(desired_withdrawal[mask1], current_cash[mask1])
-                from_equity[mask1] = desired_withdrawal[mask1] - from_cash[mask1]
-                
-            # Normal OR No Cash -> Use Equity
-            mask2 = ~mask1
-            if np.any(mask2):
-                from_equity[mask2] = np.minimum(desired_withdrawal[mask2], current_equity[mask2])
-                from_cash[mask2] = desired_withdrawal[mask2] - from_equity[mask2]
+        if np.any(to_cash_mask):
+            amount = pre_transfer[to_cash_mask]
+            available = current_equity[to_cash_mask]
+            actual = np.minimum(amount, available)
+            realized_transfer[to_cash_mask] = actual
+
+        # Apply realized transfer
+        current_cash += realized_transfer
+        current_equity -= realized_transfer
+        
+        # Update context with new balances for withdrawal phase
+        # (Important if we just moved all cash to equity!)
+        # Note: 'ctx' holds references to arrays, but we just modified the arrays in place?
+        # Numpy arrays are mutable. current_cash += ... modifies in place.
+        # So ctx.current_cash IS updated.
+        
+        # B. Withdrawals
+        from_cash, from_equity = strategy.determine_withdrawal_source(ctx)
 
         # --- EXECUTE WITHDRAWALS ---
         current_cash -= from_cash
@@ -348,21 +364,34 @@ def run_simulation(
         withdrawals_from_equity[t-1, :] = from_equity
         withdrawals[t-1, :] = from_cash + from_equity
         
-        # --- REPLENISHMENT (Common for strategies with buffer) ---
-        # No Cash Buffer strategy effectively has target=0, so this is no-op
+        # C. Post-Withdrawal Rebalance (e.g. Replenish)
+        post_transfer = strategy.post_withdrawal_rebalance(ctx)
         
-        target_cash_level = target_spend_real * buffer_years
+        # Safely apply (Assume mostly Equity->Cash replenishment here)
+        to_equity_mask = post_transfer < 0
+        to_cash_mask = post_transfer > 0
+        realized_post_transfer = np.zeros_like(post_transfer)
         
-        # Rule: Only replenish if we are at or above the Market High Water Mark
-        at_peak_mask = market_index >= (market_peak * 0.999)
-        replenish_mask = at_peak_mask & (current_cash < target_cash_level)
+        if np.any(to_cash_mask):
+            amount = post_transfer[to_cash_mask]
+            available = current_equity[to_cash_mask]
+            actual = np.minimum(amount, available)
+            realized_post_transfer[to_cash_mask] = actual
+            
+        if np.any(to_equity_mask):
+             # Rare case for post-rebalance but support it
+            amount = -post_transfer[to_equity_mask]
+            available = current_cash[to_equity_mask]
+            actual = np.minimum(amount, available)
+            realized_post_transfer[to_equity_mask] = -actual
+
+        current_cash += realized_post_transfer
+        current_equity -= realized_post_transfer
         
-        if np.any(replenish_mask):
-            shortfall = target_cash_level - current_cash[replenish_mask]
-            to_transfer = np.minimum(shortfall, current_equity[replenish_mask])
-            current_cash[replenish_mask] += to_transfer
-            current_equity[replenish_mask] -= to_transfer
-            replenishments[t-1, replenish_mask] = to_transfer
+        # Record net flow for "replenishments" metric (Equity -> Cash is positive)
+        # We combine both transfers for the metric? Or just the replenishment one?
+        # Original code tracked only replenishment. Let's track post_transfer.
+        replenishments[t-1, :] = realized_post_transfer
         
         # Store
         portfolio_values[t, :] = current_equity + current_cash
