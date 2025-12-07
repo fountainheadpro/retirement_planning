@@ -47,16 +47,17 @@ ensuring fat-tail events (2000, 2008) are represented in risk projections.
 # Sidebar Configuration
 st.sidebar.header("⚙️ Configuration")
 
-with st.sidebar.form("config_form"):
-    submitted = st.form_submit_button("🚀 Run Simulation", type="primary")
-    
-    with st.expander("Model Configuration", expanded=True):
-        model_options = ["Random Walk", "Mean Reversion (AR-1)", "Mean Reversion (AR-2)", "Mean Reversion (AR-3)", "Mean Reversion (AR-4)", "Mean Reversion (AR-5)", "Block Bootstrap"]
-        selected_model = st.selectbox(
-            "Market Model",
-            options=model_options,
-            index=model_options.index("Mean Reversion (AR-3)"), # Default to AR-3
-            help="""
+# 1. Run Button (Top Level)
+run_sim = st.sidebar.button("🚀 Run Simulation", type="primary")
+
+# 2. Market Model Settings
+with st.sidebar.expander("📊 Market Model", expanded=True):
+    model_options = ["Random Walk", "Mean Reversion (AR-1)", "Mean Reversion (AR-2)", "Mean Reversion (AR-3)", "Mean Reversion (AR-4)", "Mean Reversion (AR-5)", "Block Bootstrap"]
+    selected_model = st.selectbox(
+        "Market Model",
+        options=model_options,
+        index=model_options.index("Block Bootstrap"), # Default to Block Bootstrap
+        help="""
 Select the statistical model for simulating market returns:
 
 1. **Random Walk (Optimistic):** Assumes future returns are independent and follow the historical average distribution. Often ignores valuation risks (e.g., high P/E ratios) and assumes the "good times" will roll on average.
@@ -65,132 +66,133 @@ Select the statistical model for simulating market returns:
 
 3. **Block Bootstrap (Balanced/Realistic):** Resamples actual historical blocks of data (e.g., 5-year chunks). This preserves real-world market shocks (volatility clustering) and "fat tails" (crashes like 2000 or 2008) exactly as they happened, offering a realistic "what if history repeats" scenario.
 """
-        )
+    )
+    
+    block_size = 5 # Default value
+    if selected_model == "Block Bootstrap":
+        block_size = st.slider("Block Size (Years)", 1, 10, 5, help="Length of historical blocks to resample. Preserves historical correlations.")
         
-        block_size = 5 # Default value
-        if selected_model == "Block Bootstrap":
-            block_size = st.slider("Block Size (Years)", 1, 10, 5, help="Length of historical blocks to resample. Preserves historical correlations.")
-            
-        history_years = st.slider(
-            "Historical Data (Years)",
-            min_value=20,
-            max_value=100,
-            value=50,
-            help="Look-back window for calibration. Affects all models."
-        )
+    history_years = st.slider(
+        "Historical Data (Years)",
+        min_value=20,
+        max_value=100,
+        value=50,
+        help="Look-back window for calibration. Affects all models."
+    )
 
-    with st.expander("Portfolio Settings", expanded=True):
-        initial_net_worth = st.number_input(
-            "Initial Net Worth ($)",
-            min_value=100_000,
-            max_value=50_000_000,
-            value=2_000_000,
-            step=100_000,
-            format="%d"
-        )
-
-        annual_spend = st.number_input(
-            "Annual Spending ($)",
-            min_value=10_000,
-            max_value=1_000_000,
-            value=80_000,
-            step=10_000,
-            format="%d"
-        )
-
-        # Strategy Selector
-        strategy_display = st.selectbox(
-            "Cash Strategy",
-            options=[
-                "Conservative (Protect Withdrawals)", 
-                "Aggressive (Buy the Dip)", 
-                "Fully Invested (No Cash Buffer)"
-            ],
-            index=0,
-            help="""
+# 3. Portfolio & Strategy Settings
+with st.sidebar.expander("💰 Portfolio & Strategy", expanded=True):
+    strategy_display = st.selectbox(
+        "Cash Strategy",
+        options=[
+            "Conservative (Protect Withdrawals)", 
+            "Aggressive (Buy the Dip)", 
+            "Fully Invested (No Cash Buffer)"
+        ],
+        index=0,
+        help="""
 **Conservative:** Uses cash buffer to fund withdrawals during market downturns (Panic/Drawdown) to avoid selling equity at a loss. Replenishes cash only when market recovers (High Water Mark).
 
 **Aggressive (Buy the Dip):** Uses cash buffer to BUY equity during market downturns. Withdrawals come from Equity. Replenishes cash when market recovers.
 
 **Fully Invested:** Holds 0% cash. All funds in equity. Withdrawals always sold from equity.
 """
+    )
+    
+    # Map display name to internal name
+    strategy_map = {
+        "Conservative (Protect Withdrawals)": "Conservative",
+        "Aggressive (Buy the Dip)": "Aggressive",
+        "Fully Invested (No Cash Buffer)": "No Cash Buffer"
+    }
+    selected_strategy = strategy_map[strategy_display]
+
+    initial_net_worth = st.number_input(
+        "Initial Net Worth ($)",
+        min_value=100_000,
+        max_value=50_000_000,
+        value=2_000_000,
+        step=100_000,
+        format="%d"
+    )
+
+    annual_spend = st.number_input(
+        "Annual Spending ($)",
+        min_value=10_000,
+        max_value=1_000_000,
+        value=80_000,
+        step=10_000,
+        format="%d"
+    )
+
+    # Conditional Inputs (Reactive)
+    if selected_strategy != "No Cash Buffer":
+        buffer_years = st.slider(
+            "Cash Buffer (Years)",
+            min_value=0,
+            max_value=5,
+            value=2,
+            help="Years of expenses to keep in cash buffer"
         )
         
-        # Map display name to internal name
-        strategy_map = {
-            "Conservative (Protect Withdrawals)": "Conservative",
-            "Aggressive (Buy the Dip)": "Aggressive",
-            "Fully Invested (No Cash Buffer)": "No Cash Buffer"
-        }
-        selected_strategy = strategy_map[strategy_display]
-
-        # Conditional Inputs
-        if selected_strategy != "No Cash Buffer":
-            buffer_years = st.slider(
-                "Cash Buffer (Years)",
-                min_value=0,
-                max_value=5,
-                value=2,
-                help="Years of expenses to keep in cash buffer"
-            )
-            
-            cash_interest_rate = st.slider(
-                "Cash Interest Rate (%)",
-                min_value=0.0,
-                max_value=10.0,
-                value=3.0,
-                step=0.5,
-                help="Nominal interest rate earned on cash buffer. Defaults to matching inflation if not set."
-            ) / 100
-        else:
-            buffer_years = 0
-            cash_interest_rate = 0.0
-
-        spending_cap_pct = st.slider(
-            "Spending Cap (% of Portfolio)",
-            min_value=1.0,
-            max_value=10.0,
-            value=4.0,
-            step=0.5,
-            help="Maximum annual withdrawal as percentage of total portfolio value"
-        ) / 100
-
-    with st.expander("Simulation Settings", expanded=True):
-        years = st.slider(
-            "Simulation Duration (Years)",
-            min_value=10,
-            max_value=50,
-            value=30
-        )
-
-        panic_threshold = st.slider(
-            "Panic Threshold (%)",
-            min_value=-50,
-            max_value=0,
-            value=-15,
-            help="Market drop that triggers cash usage"
-        ) / 100
-
-        inflation_rate = st.slider(
-            "Inflation Rate (%)",
+        cash_interest_rate = st.slider(
+            "Cash Interest Rate (%)",
             min_value=0.0,
             max_value=10.0,
             value=3.0,
-            step=0.5
+            step=0.5,
+            help="Nominal interest rate earned on cash buffer. Defaults to matching inflation if not set."
         ) / 100
+    else:
+        buffer_years = 0
+        cash_interest_rate = 0.0
 
-        n_paths = st.select_slider(
-            "Monte Carlo Paths",
-            options=[500, 1000, 2000, 5000, 10000],
-            value=5000
-        )
+    spending_cap_pct = st.slider(
+        "Spending Cap (% of Portfolio)",
+        min_value=1.0,
+        max_value=10.0,
+        value=4.0,
+        step=0.5,
+        help="Maximum annual withdrawal as percentage of total portfolio value"
+    ) / 100
 
-        confidence = st.slider(
-            "Confidence Level (%)",
-            min_value=80,
-            max_value=99,
-            value=90
-        ) / 100
+# 4. Simulation Settings
+with st.sidebar.expander("🎲 Simulation Parameters", expanded=True):
+    years = st.slider(
+        "Simulation Duration (Years)",
+        min_value=10,
+        max_value=50,
+        value=30
+    )
+
+    panic_threshold = st.slider(
+        "Panic Threshold (%)",
+        min_value=-50,
+        max_value=0,
+        value=-15,
+        help="Market drop that triggers cash usage"
+    ) / 100
+
+    inflation_rate = st.slider(
+        "Inflation Rate (%)",
+        min_value=0.0,
+        max_value=10.0,
+        value=3.0,
+        step=0.5
+    ) / 100
+
+    n_paths = st.select_slider(
+        "Monte Carlo Paths",
+        options=[500, 1000, 2000, 5000, 10000],
+        value=5000
+    )
+
+    confidence = st.slider(
+        "Confidence Level (%)",
+        min_value=80,
+        max_value=99,
+        value=90
+    ) / 100
 
 
 # Cache data fetching
@@ -200,7 +202,7 @@ def fetch_market_data(history_years: int):
     return get_sp500_residuals(history_years)
 
 
-if submitted or 'results' not in st.session_state:
+if run_sim or 'results' not in st.session_state:
     with st.spinner("Fetching market data..."):
         try:
             # Fetch data once for all models
