@@ -425,7 +425,7 @@
   <div class="page">
     <header class="hero">
       <div>
-        <p class="eyebrow">Retirement Planning Report · May 13, 2026</p>
+        <p class="eyebrow">Retirement Planning Report · May 14, 2026</p>
         <h1>A Retirement Plan That Breaks The 60/40 Story</h1>
         <p class="dek">A retiree with a few million dollars does not have one spending number. They have mandatory expenses, discretionary lifestyle, and the ability to downshift. That changes the portfolio question.</p>
       </div>
@@ -437,19 +437,19 @@
 
     <div class="metric-strip" aria-label="Key findings">
       <div class="metric">
-        <strong>0.00%</strong>
+        <strong>0.01%</strong>
         <span>ruin rate for the classic 4% target with 60/40</span>
       </div>
       <div class="metric">
-        <strong>18.51%</strong>
+        <strong>26.01%</strong>
         <span>target-shortfall path-years for that same 4% 60/40 plan</span>
       </div>
       <div class="metric">
-        <strong>2.47x</strong>
+        <strong>2.06x</strong>
         <span>median ending wealth for 4% 60/40</span>
       </div>
       <div class="metric">
-        <strong>4.11x</strong>
+        <strong>3.32x</strong>
         <span>median ending wealth for the 5% stock-only flexible baseline</span>
       </div>
     </div>
@@ -482,10 +482,10 @@
                 <tr><th>Benchmark</th><th>Target / floor</th><th>Bonds</th><th>Ruin</th><th>Target shortfall</th><th>Final median</th></tr>
               </thead>
               <tbody>
-                <tr><td>4% stock-only</td><td>4% / 2%</td><td>0%</td><td>0.04%</td><td>14.83%</td><td>5.19x</td></tr>
-                <tr><td>Traditional 4% 60/40</td><td>4% / 2%</td><td>40%</td><td>0.00%</td><td>18.51%</td><td>2.47x</td></tr>
-                <tr><td>5% stock-only flexible baseline</td><td>5% / 2.5%</td><td>0%</td><td>0.40%</td><td>19.60%</td><td>4.11x</td></tr>
-                <tr><td>5% 60/40</td><td>5% / 2.5%</td><td>40%</td><td>0.00%</td><td>29.27%</td><td>1.75x</td></tr>
+                <tr><td>4% stock-only</td><td>4% / 2%</td><td>0%</td><td>0.23%</td><td>19.40%</td><td>4.27x</td></tr>
+                <tr><td>Traditional 4% 60/40</td><td>4% / 2%</td><td>40%</td><td>0.01%</td><td>26.01%</td><td>2.06x</td></tr>
+                <tr><td>5% stock-only flexible baseline</td><td>5% / 2.5%</td><td>0%</td><td>1.21%</td><td>24.73%</td><td>3.32x</td></tr>
+                <tr><td>5% 60/40</td><td>5% / 2.5%</td><td>40%</td><td>0.31%</td><td>36.13%</td><td>1.41x</td></tr>
               </tbody>
             </table>
           </div>
@@ -541,24 +541,25 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
           </figure>
 
           <h3>Model</h3>
-          <p>The simulations use 20,000 Monte Carlo paths, annual returns, fixed 3% inflation, and historical block bootstrap. The main lookback window is 1951-2025 from Aswath Damodaran’s annual return dataset, using the S&amp;P 500 total-return series with dividends reinvested.</p>
-          <p>For stock/bond tests, the model uses paired block bootstrap: stock and bond returns are sampled from the same historical years in the same 5-year blocks.</p>
+          <p>The simulations use 20,000 Monte Carlo paths, annual returns, historical CPI inflation, and historical block bootstrap. The main lookback window is 1951-2025 from Aswath Damodaran’s annual return dataset, using the S&amp;P 500 total-return series with dividends reinvested.</p>
+          <p>Inflation comes from <a href="https://fred.stlouisfed.org/series/CPIAUCNS">FRED CPI-U</a>, calculated December-to-December. Stock, bond, and inflation records are joined by year and sampled from the same 5-year historical blocks. Cash is modeled as earning the sampled inflation rate, so cash has a 0% real return.</p>
         </section>
 
         <section id="cash">
           <h2>Experiment 1: Cash Buffer</h2>
-          <p>This experiment varies the cash buffer from 0 to 5 years of target spending. The portfolio is otherwise invested in the Damodaran S&amp;P 500 total-return series, which includes dividends reinvested, using the 75-year lookback window.</p>
+          <p>This experiment varies the cash buffer from 0 to 5 years of target spending. A buffer is measured in years of the target withdrawal. For example, with a $5M portfolio and a 4% target, target spending is $200,000, so a 5-year cash buffer is $1M held in cash. Cash is modeled as earning the sampled inflation rate, which is equivalent to a 0% real return.</p>
+          <p>The remaining portfolio is invested in the Damodaran S&amp;P 500 total-return series, using the 75-year lookback window with aligned historical inflation.</p>
           <div class="table-wrap">
             <table>
               <thead>
                 <tr><th>Cash buffer</th><th>Ruin</th><th>Target shortfall</th><th>Floor breach</th><th>Final p10</th><th>Final median</th></tr>
               </thead>
               <tbody>
-                <tr><td>0 years</td><td>0.40%</td><td>19.60%</td><td>0.06%</td><td>0.82x</td><td>4.11x</td></tr>
-                <tr><td>1 year</td><td>0.39%</td><td>20.15%</td><td>0.06%</td><td>0.79x</td><td>3.88x</td></tr>
-                <tr><td>2 years</td><td>0.34%</td><td>21.33%</td><td>0.05%</td><td>0.75x</td><td>3.53x</td></tr>
-                <tr><td>3 years</td><td>0.29%</td><td>22.96%</td><td>0.04%</td><td>0.69x</td><td>3.15x</td></tr>
-                <tr><td>5 years</td><td>0.21%</td><td>28.17%</td><td>0.02%</td><td>0.56x</td><td>2.33x</td></tr>
+                <tr><td>0 years</td><td>1.21%</td><td>24.73%</td><td>0.20%</td><td>0.60x</td><td>3.32x</td></tr>
+                <tr><td>1 year</td><td>1.09%</td><td>25.44%</td><td>0.17%</td><td>0.58x</td><td>3.11x</td></tr>
+                <tr><td>2 years</td><td>1.00%</td><td>26.80%</td><td>0.14%</td><td>0.55x</td><td>2.82x</td></tr>
+                <tr><td>3 years</td><td>0.93%</td><td>28.65%</td><td>0.12%</td><td>0.51x</td><td>2.50x</td></tr>
+                <tr><td>5 years</td><td>0.81%</td><td>33.86%</td><td>0.08%</td><td>0.41x</td><td>1.81x</td></tr>
               </tbody>
             </table>
           </div>
@@ -566,7 +567,7 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
             <img src="assets/bond_report_cash_buffer.png" alt="Cash buffer tradeoff chart.">
             <figcaption>Cash reduces the already-small floor risk only slightly, while target shortfall rises and ending wealth falls.</figcaption>
           </figure>
-          <p>This is the key setup decision for the rest of the report: use zero cash buffer as the baseline, then ask what spending cap is reasonable under that assumption.</p>
+          <p class="callout"><b>Conclusion:</b> cash still does what cash is supposed to do: it slightly lowers ruin and floor-breach risk. But it is expensive. A 5-year buffer lowers ruin from 1.21% to 0.81%, while target shortfall rises from 24.73% to 33.86% and median ending wealth falls from 3.32x to 1.81x. That is why the rest of the report uses zero cash buffer as the baseline.</p>
         </section>
 
         <section id="history">
@@ -578,9 +579,9 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
                 <tr><th>History window</th><th>Ruin</th><th>Target shortfall</th><th>Floor breach</th><th>Final p10</th><th>Final median</th></tr>
               </thead>
               <tbody>
-                <tr><td>50 years (1976-2025)</td><td>0.34%</td><td>16.03%</td><td>0.05%</td><td>1.04x</td><td>5.56x</td></tr>
-                <tr><td>75 years (1951-2025)</td><td>0.40%</td><td>19.60%</td><td>0.06%</td><td>0.82x</td><td>4.11x</td></tr>
-                <tr><td>98 years (1928-2025)</td><td>3.74%</td><td>27.47%</td><td>0.95%</td><td>0.41x</td><td>2.99x</td></tr>
+                <tr><td>50 years (1976-2025)</td><td>0.33%</td><td>19.11%</td><td>0.04%</td><td>0.88x</td><td>4.47x</td></tr>
+                <tr><td>75 years (1951-2025)</td><td>1.21%</td><td>24.73%</td><td>0.20%</td><td>0.60x</td><td>3.32x</td></tr>
+                <tr><td>98 years (1928-2025)</td><td>2.25%</td><td>29.85%</td><td>0.41%</td><td>0.44x</td><td>2.64x</td></tr>
               </tbody>
             </table>
           </div>
@@ -588,7 +589,7 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
             <img src="assets/bond_report_history_sensitivity.png" alt="Historical window sensitivity chart.">
             <figcaption>The Depression-inclusive 98-year case is a useful stress test, but it pulls in a different economic regime.</figcaption>
           </figure>
-          <p class="callout">Important caveat: fixed 3% inflation means the model includes 1970s nominal asset returns but does not fully include 1970s spending-pressure inflation.</p>
+          <p class="callout"><b>Conclusion:</b> the 75-year window is meaningfully tougher than the last 50 years because it keeps more weak stock/inflation sequences. The Depression-inclusive 98-year window is harsher again, but the main 75-year result is no longer hiding the 1970s inflation problem because inflation is sampled from the same historical years as returns.</p>
         </section>
 
         <section id="withdrawal">
@@ -600,19 +601,19 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
                 <tr><th>Target cap</th><th>Floor</th><th>Ruin</th><th>Target shortfall</th><th>Floor breach</th><th>Final p10</th><th>Final median</th></tr>
               </thead>
               <tbody>
-                <tr><td>4%</td><td>2.0%</td><td>0.04%</td><td>14.83%</td><td>0.00%</td><td>1.20x</td><td>5.19x</td></tr>
-                <tr><td>5%</td><td>2.5%</td><td>0.40%</td><td>19.60%</td><td>0.06%</td><td>0.82x</td><td>4.11x</td></tr>
-                <tr><td>6%</td><td>3.0%</td><td>1.42%</td><td>25.56%</td><td>0.26%</td><td>0.56x</td><td>3.09x</td></tr>
-                <tr><td>7%</td><td>3.5%</td><td>4.04%</td><td>32.73%</td><td>0.79%</td><td>0.32x</td><td>2.13x</td></tr>
-                <tr><td>8%</td><td>4.0%</td><td>9.26%</td><td>40.56%</td><td>2.03%</td><td>0.03x</td><td>1.27x</td></tr>
-                <tr><td>9%</td><td>4.5%</td><td>17.52%</td><td>49.12%</td><td>4.28%</td><td>0.00x</td><td>0.75x</td></tr>
-                <tr><td>10%</td><td>5.0%</td><td>28.44%</td><td>57.56%</td><td>7.66%</td><td>0.00x</td><td>0.47x</td></tr>
+                <tr><td>4%</td><td>2.0%</td><td>0.23%</td><td>19.40%</td><td>0.03%</td><td>0.86x</td><td>4.27x</td></tr>
+                <tr><td>5%</td><td>2.5%</td><td>1.21%</td><td>24.73%</td><td>0.20%</td><td>0.60x</td><td>3.32x</td></tr>
+                <tr><td>6%</td><td>3.0%</td><td>3.25%</td><td>30.93%</td><td>0.64%</td><td>0.36x</td><td>2.40x</td></tr>
+                <tr><td>7%</td><td>3.5%</td><td>7.53%</td><td>37.91%</td><td>1.67%</td><td>0.11x</td><td>1.58x</td></tr>
+                <tr><td>8%</td><td>4.0%</td><td>14.54%</td><td>45.53%</td><td>3.53%</td><td>0.00x</td><td>0.95x</td></tr>
+                <tr><td>9%</td><td>4.5%</td><td>23.89%</td><td>53.37%</td><td>6.45%</td><td>0.00x</td><td>0.60x</td></tr>
+                <tr><td>10%</td><td>5.0%</td><td>35.38%</td><td>60.95%</td><td>10.42%</td><td>0.00x</td><td>0.33x</td></tr>
               </tbody>
             </table>
           </div>
           <figure class="figure">
             <img src="assets/bond_report_safe_withdrawal_search.png" alt="Safe withdrawal search chart.">
-            <figcaption>4-5% is durable in this model, 6-7% is aggressive, and 8-10% becomes fragile quickly.</figcaption>
+            <figcaption>4-5% remains the durable range, 6-7% is aggressive, and 8-10% becomes fragile quickly.</figcaption>
           </figure>
           <div class="table-wrap">
             <table>
@@ -620,16 +621,17 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
                 <tr><th>Target cap</th><th>Shortfall path-years</th><th>Ever miss target</th><th>Median shortfall years if any</th><th>Avg shortfall-year spending</th><th>Avg target gap</th></tr>
               </thead>
               <tbody>
-                <tr><td>4%</td><td>14.83%</td><td>55.17%</td><td>5</td><td>3.10%</td><td>22.4%</td></tr>
-                <tr><td>5%</td><td>19.60%</td><td>59.84%</td><td>7</td><td>3.77%</td><td>24.7%</td></tr>
-                <tr><td>6%</td><td>25.56%</td><td>65.12%</td><td>9</td><td>4.36%</td><td>27.3%</td></tr>
-                <tr><td>7%</td><td>32.73%</td><td>68.99%</td><td>14</td><td>4.88%</td><td>30.3%</td></tr>
-                <tr><td>8%</td><td>40.56%</td><td>73.10%</td><td>19</td><td>5.28%</td><td>34.0%</td></tr>
-                <tr><td>9%</td><td>49.12%</td><td>77.50%</td><td>22</td><td>5.59%</td><td>37.9%</td></tr>
-                <tr><td>10%</td><td>57.56%</td><td>83.70%</td><td>24</td><td>5.77%</td><td>42.3%</td></tr>
+                <tr><td>4%</td><td>19.40%</td><td>61.05%</td><td>6</td><td>3.00%</td><td>25.1%</td></tr>
+                <tr><td>5%</td><td>24.73%</td><td>64.46%</td><td>9</td><td>3.63%</td><td>27.5%</td></tr>
+                <tr><td>6%</td><td>30.93%</td><td>70.06%</td><td>11</td><td>4.18%</td><td>30.3%</td></tr>
+                <tr><td>7%</td><td>37.91%</td><td>73.24%</td><td>16</td><td>4.64%</td><td>33.6%</td></tr>
+                <tr><td>8%</td><td>45.53%</td><td>77.60%</td><td>20</td><td>5.01%</td><td>37.3%</td></tr>
+                <tr><td>9%</td><td>53.37%</td><td>81.99%</td><td>23</td><td>5.28%</td><td>41.4%</td></tr>
+                <tr><td>10%</td><td>60.95%</td><td>85.65%</td><td>25</td><td>5.43%</td><td>45.7%</td></tr>
               </tbody>
             </table>
           </div>
+          <p class="callout"><b>Conclusion:</b> sampling inflation makes every spending level more stressful than the fixed-3% version. The practical range still centers around 4-5% for this flexible target/floor rule. At 6%, ruin and floor breach become noticeable; above that, the plan depends too heavily on favorable sequences.</p>
         </section>
 
         <section id="block-size">
@@ -641,14 +643,14 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
                 <tr><th>Block size</th><th>Ruin</th><th>Target shortfall</th><th>Floor breach</th><th>Final p10</th><th>Final median</th></tr>
               </thead>
               <tbody>
-                <tr><td>1 year</td><td>0.84%</td><td>20.03%</td><td>0.17%</td><td>0.79x</td><td>4.61x</td></tr>
-                <tr><td>3 years</td><td>0.49%</td><td>18.23%</td><td>0.11%</td><td>0.86x</td><td>4.31x</td></tr>
-                <tr><td>5 years</td><td>0.40%</td><td>19.60%</td><td>0.06%</td><td>0.82x</td><td>4.11x</td></tr>
-                <tr><td>10 years</td><td>0.68%</td><td>22.79%</td><td>0.09%</td><td>0.69x</td><td>3.59x</td></tr>
+                <tr><td>1 year</td><td>1.47%</td><td>23.46%</td><td>0.32%</td><td>0.62x</td><td>3.82x</td></tr>
+                <tr><td>3 years</td><td>1.16%</td><td>22.89%</td><td>0.23%</td><td>0.65x</td><td>3.46x</td></tr>
+                <tr><td>5 years</td><td>1.21%</td><td>24.73%</td><td>0.20%</td><td>0.60x</td><td>3.32x</td></tr>
+                <tr><td>10 years</td><td>2.37%</td><td>27.44%</td><td>0.33%</td><td>0.44x</td><td>2.87x</td></tr>
               </tbody>
             </table>
           </div>
-          <p>The direction of the result is not dependent on the exact 5-year block choice, but the numbers move enough to treat the second decimal place as false precision.</p>
+          <p class="callout"><b>Conclusion:</b> the direction of the result is not dependent on the exact 5-year block choice, but the numbers move enough to treat the second decimal place as false precision. Longer 10-year blocks produce worse outcomes here because they preserve longer bad return/inflation regimes.</p>
         </section>
 
         <section id="bonds">
@@ -660,11 +662,11 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
                 <tr><th>Bond allocation</th><th>Ruin</th><th>Target shortfall</th><th>Floor breach</th><th>Final p10</th><th>Final median</th></tr>
               </thead>
               <tbody>
-                <tr><td>0% bonds</td><td>0.40%</td><td>19.60%</td><td>0.06%</td><td>0.82x</td><td>4.11x</td></tr>
-                <tr><td>10% bonds</td><td>0.22%</td><td>20.38%</td><td>0.02%</td><td>0.82x</td><td>3.46x</td></tr>
-                <tr><td>20% bonds</td><td>0.04%</td><td>21.92%</td><td>0.00%</td><td>0.78x</td><td>2.85x</td></tr>
-                <tr><td>40% bonds</td><td>0.00%</td><td>29.27%</td><td>0.00%</td><td>0.67x</td><td>1.75x</td></tr>
-                <tr><td>60% bonds</td><td>0.00%</td><td>47.84%</td><td>0.00%</td><td>0.52x</td><td>0.96x</td></tr>
+                <tr><td>0% bonds</td><td>1.21%</td><td>24.73%</td><td>0.20%</td><td>0.60x</td><td>3.32x</td></tr>
+                <tr><td>10% bonds</td><td>0.78%</td><td>25.98%</td><td>0.11%</td><td>0.59x</td><td>2.80x</td></tr>
+                <tr><td>20% bonds</td><td>0.48%</td><td>28.07%</td><td>0.06%</td><td>0.57x</td><td>2.29x</td></tr>
+                <tr><td>40% bonds</td><td>0.31%</td><td>36.13%</td><td>0.03%</td><td>0.49x</td><td>1.41x</td></tr>
+                <tr><td>60% bonds</td><td>0.45%</td><td>51.71%</td><td>0.04%</td><td>0.37x</td><td>0.83x</td></tr>
               </tbody>
             </table>
           </div>
@@ -675,11 +677,11 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
           <div class="grid-two">
             <div class="note-card">
               <h3>0% bonds</h3>
-              <p>19.60% target-shortfall path-years and 4.11x median ending wealth.</p>
+              <p>24.73% target-shortfall path-years and 3.32x median ending wealth.</p>
             </div>
             <div class="note-card">
               <h3>60% bonds</h3>
-              <p>47.84% target-shortfall path-years and 0.96x median ending wealth.</p>
+              <p>51.71% target-shortfall path-years and 0.83x median ending wealth.</p>
             </div>
           </div>
           <div class="table-wrap">
@@ -688,11 +690,11 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
                 <tr><th>Bond allocation</th><th>Shortfall path-years</th><th>Ever miss target</th><th>Median shortfall years if any</th><th>Avg shortfall-year spending</th><th>Avg target gap</th></tr>
               </thead>
               <tbody>
-                <tr><td>0% bonds</td><td>19.60%</td><td>59.84%</td><td>7</td><td>3.77%</td><td>24.7%</td></tr>
-                <tr><td>10% bonds</td><td>20.38%</td><td>61.36%</td><td>7</td><td>3.87%</td><td>22.5%</td></tr>
-                <tr><td>20% bonds</td><td>21.92%</td><td>63.03%</td><td>7</td><td>3.97%</td><td>20.7%</td></tr>
-                <tr><td>40% bonds</td><td>29.27%</td><td>69.70%</td><td>10</td><td>4.08%</td><td>18.4%</td></tr>
-                <tr><td>60% bonds</td><td>47.84%</td><td>81.85%</td><td>20</td><td>4.02%</td><td>19.5%</td></tr>
+                <tr><td>0% bonds</td><td>24.73%</td><td>64.46%</td><td>9</td><td>3.63%</td><td>27.5%</td></tr>
+                <tr><td>10% bonds</td><td>25.98%</td><td>64.25%</td><td>10</td><td>3.70%</td><td>26.1%</td></tr>
+                <tr><td>20% bonds</td><td>28.07%</td><td>68.02%</td><td>10</td><td>3.76%</td><td>24.9%</td></tr>
+                <tr><td>40% bonds</td><td>36.13%</td><td>72.44%</td><td>15</td><td>3.81%</td><td>23.8%</td></tr>
+                <tr><td>60% bonds</td><td>51.71%</td><td>84.02%</td><td>21</td><td>3.74%</td><td>25.1%</td></tr>
               </tbody>
             </table>
           </div>
@@ -700,6 +702,7 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
             <img src="assets/bond_report_objective_tradeoff.png" alt="Objective tradeoff chart.">
             <figcaption>Each step toward more bonds moves down and to the right: lower median ending wealth and higher target shortfall.</figcaption>
           </figure>
+          <p class="callout"><b>Conclusion:</b> bonds reduce ruin and floor-breach risk, but they do not improve the target/floor objective. The traditional 60/40 row cuts ruin from 1.21% to 0.31%, while target shortfall rises from 24.73% to 36.13% and median ending wealth falls from 3.32x to 1.41x.</p>
         </section>
 
         <section id="interpretation">
@@ -717,7 +720,7 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
               <ul>
                 <li>Taxes and fees are ignored.</li>
                 <li>Returns are annual, not monthly.</li>
-                <li>Inflation is fixed at 3%.</li>
+                <li>Inflation is annual CPI-U, not monthly household-specific inflation.</li>
                 <li>Bonds are 10-year Treasury total returns.</li>
                 <li>No Social Security, pension, mortgage, or health shock modeling.</li>
               </ul>
@@ -725,7 +728,7 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
             <div class="note-card">
               <h3>Follow-up tests</h3>
               <ul>
-                <li>Historical inflation or real returns.</li>
+                <li>Alternative inflation sources and spending baskets.</li>
                 <li>TIPS and short Treasury ladders.</li>
                 <li>Explicit floor funding.</li>
                 <li>Monthly withdrawal timing.</li>
@@ -733,7 +736,7 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
               </ul>
             </div>
           </div>
-          <p>The result should be framed narrowly: under this specific flexible spending rule, with annual returns, fixed inflation, and permanent cash/bond allocations, high defensive allocations did not improve the selected objective.</p>
+          <p>The result should be framed narrowly: under this specific flexible spending rule, with annual returns, sampled historical CPI inflation, and permanent cash/bond allocations, high defensive allocations did not improve the selected objective.</p>
         </section>
 
         <footer>

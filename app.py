@@ -227,7 +227,8 @@ with st.sidebar.expander("🎲 Simulation Parameters", expanded=True):
         min_value=0.0,
         max_value=10.0,
         value=3.0,
-        step=0.5
+        step=0.5,
+        help="Used by Random Walk, Mean Reversion, and stock-only bootstrap. Stock/Bond Block Bootstrap uses historical CPI inflation sampled from the same years as stock and bond returns."
     ) / 100
 
     n_paths = st.select_slider(
@@ -285,11 +286,12 @@ if run_sim or 'results' not in st.session_state:
                 market_model = PairedBlockBootstrapMarket(
                     stock_returns=asset_history["stock_returns"],
                     bond_returns=asset_history["bond_returns"],
+                    inflation_rates=asset_history["inflation_rates"],
                     block_size=block_size,
                 )
                 model_info_msg = (
                     f"Stock/Bond Bootstrap (Bond Allocation: {bond_allocation_pct:.0%}, "
-                    f"Block Size: {block_size}y, History: {len(asset_history['years'])}y, "
+                    f"Historical Inflation, Block Size: {block_size}y, History: {len(asset_history['years'])}y, "
                     f"Years: {asset_history['years'][0]}-{asset_history['years'][-1]})"
                 )
                 
@@ -377,6 +379,7 @@ if run_sim or 'results' not in st.session_state:
             'buffer_years': buffer_years,
             'inflation_rate': inflation_rate,
             'bond_allocation_pct': bond_allocation_pct,
+            'uses_historical_inflation': selected_model == "Stock/Bond Block Bootstrap",
             'strategy': selected_strategy # Store string name for display logic
         }
     }
@@ -596,7 +599,18 @@ if 'results' in st.session_state:
     
     # Calculate real cash return for display in tooltip
     # Use variables directly from widgets to avoid KeyError on first run/stale state
+    uses_historical_inflation = params.get('uses_historical_inflation', False)
     real_cash_return_for_display = (1 + cash_interest_rate) / (1 + inflation_rate) - 1
+    if uses_historical_inflation:
+        cash_growth_desc = (
+            f"**Cash Growth:** Cash in the buffer grows at the nominal interest rate of {cash_interest_rate:.1%}. "
+            "Real cash return varies by sampled historical CPI inflation year."
+        )
+    else:
+        cash_growth_desc = (
+            f"**Cash Growth:** Cash in the buffer grows at the nominal interest rate of {cash_interest_rate:.1%} "
+            f"(equivalent to {real_cash_return_for_display:.1%} real return given {inflation_rate:.1%} inflation)."
+        )
 
     # Dynamic Description based on Strategy
     strat_desc = ""
@@ -635,7 +649,7 @@ This chart shows the composition of your portfolio for a specific "risk scenario
 {strat_desc}
 {bond_desc}
 
-**Cash Growth:** Cash in the buffer grows at the nominal interest rate of {cash_interest_rate:.1%} (equivalent to {real_cash_return_for_display:.1%} real return given {inflation_rate:.1%} inflation).
+{cash_growth_desc}
 """)
     
     # Improved Risk Path Selection: Nearest Neighbor to the Risk Boundary Curve

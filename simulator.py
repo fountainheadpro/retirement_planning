@@ -34,11 +34,18 @@ class BlockBootstrapMarket:
     Models the market by resampling blocks of historical returns to preserve
     correlation structure (autocorrelation, volatility clustering).
     """
-    def __init__(self, history_returns, block_size=5):
+    def __init__(self, history_returns, block_size=5, inflation_rates=None):
         self.block_size = block_size
         self.history = np.asarray(history_returns).ravel()
+        self.inflation_history = (
+            np.asarray(inflation_rates).ravel()
+            if inflation_rates is not None
+            else None
+        )
         if len(self.history) < self.block_size:
             raise ValueError(f"History length {len(self.history)} is shorter than block size {self.block_size}")
+        if self.inflation_history is not None and len(self.inflation_history) != len(self.history):
+            raise ValueError("Inflation history must have the same length as return history")
         
     def simulate_matrix(self, years, n_paths):
         """
@@ -48,39 +55,59 @@ class BlockBootstrapMarket:
         n_history = len(self.history)
         n_blocks = int(np.ceil(years / self.block_size))
         
-        # Output matrix
         market_matrix = np.zeros((years, n_paths))
+        inflation_matrix = (
+            np.zeros((years, n_paths))
+            if self.inflation_history is not None
+            else None
+        )
         
         for i in range(n_paths):
             path = []
+            inflation_path = []
             for _ in range(n_blocks):
                 # Pick a random start index
                 start_idx = np.random.randint(0, n_history - self.block_size + 1)
-                block = self.history[start_idx : start_idx + self.block_size]
+                end_idx = start_idx + self.block_size
+                block = self.history[start_idx:end_idx]
                 path.extend(block)
+                if self.inflation_history is not None:
+                    inflation_path.extend(self.inflation_history[start_idx:end_idx])
             
             # Trim to exact number of years and assign
             market_matrix[:, i] = path[:years]
+            if inflation_matrix is not None:
+                inflation_matrix[:, i] = inflation_path[:years]
             
+        if inflation_matrix is not None:
+            return {"stock": market_matrix, "inflation": inflation_matrix}
+
         return market_matrix
 
 class PairedBlockBootstrapMarket:
     """
-    Models paired stock and bond returns by resampling matching historical blocks.
+    Models paired stock, bond, and inflation records by resampling matching historical blocks.
     """
-    def __init__(self, stock_returns, bond_returns, block_size=5):
+    def __init__(self, stock_returns, bond_returns, block_size=5, inflation_rates=None):
         self.block_size = block_size
         self.stock_history = np.asarray(stock_returns).ravel()
         self.bond_history = np.asarray(bond_returns).ravel()
+        self.inflation_history = (
+            np.asarray(inflation_rates).ravel()
+            if inflation_rates is not None
+            else None
+        )
 
         if len(self.stock_history) != len(self.bond_history):
             raise ValueError("Stock and bond histories must have the same length")
+        if self.inflation_history is not None and len(self.inflation_history) != len(self.stock_history):
+            raise ValueError("Inflation history must have the same length as stock and bond histories")
         if len(self.stock_history) < self.block_size:
             raise ValueError(f"History length {len(self.stock_history)} is shorter than block size {self.block_size}")
 
     def simulate_matrix(self, years, n_paths):
         """
-        Generates paired stock and bond return matrices using block bootstrapping.
+        Generates paired stock, bond, and inflation matrices using block bootstrapping.
         Returns: dict with arrays of shape (years, n_paths)
         """
         n_history = len(self.stock_history)
@@ -88,20 +115,33 @@ class PairedBlockBootstrapMarket:
 
         stock_matrix = np.zeros((years, n_paths))
         bond_matrix = np.zeros((years, n_paths))
+        inflation_matrix = (
+            np.zeros((years, n_paths))
+            if self.inflation_history is not None
+            else None
+        )
 
         for i in range(n_paths):
             stock_path = []
             bond_path = []
+            inflation_path = []
             for _ in range(n_blocks):
                 start_idx = np.random.randint(0, n_history - self.block_size + 1)
                 end_idx = start_idx + self.block_size
                 stock_path.extend(self.stock_history[start_idx:end_idx])
                 bond_path.extend(self.bond_history[start_idx:end_idx])
+                if self.inflation_history is not None:
+                    inflation_path.extend(self.inflation_history[start_idx:end_idx])
 
             stock_matrix[:, i] = stock_path[:years]
             bond_matrix[:, i] = bond_path[:years]
+            if inflation_matrix is not None:
+                inflation_matrix[:, i] = inflation_path[:years]
 
-        return {"stock": stock_matrix, "bond": bond_matrix}
+        result = {"stock": stock_matrix, "bond": bond_matrix}
+        if inflation_matrix is not None:
+            result["inflation"] = inflation_matrix
+        return result
 
 class MeanRevertingMarket:
     """
@@ -218,8 +258,10 @@ def get_sp500_data(history_years=60):
 
 @st.cache_data
 def get_stock_bond_data(history_years=75, bond_column="TreasuryBondReturn"):
-    """Load paired annual stock and bond returns from the local Damodaran dataset."""
-    df = pd.read_csv("historical_asset_returns.csv")
+    """Load paired annual stock, bond, and inflation records."""
+    returns = pd.read_csv("historical_asset_returns.csv")
+    inflation = pd.read_csv("historical_inflation.csv")
+    df = returns.merge(inflation, on="Year", how="inner", validate="one_to_one")
     df = df.sort_values("Year")
 
     if bond_column not in df.columns:
@@ -232,6 +274,7 @@ def get_stock_bond_data(history_years=75, bond_column="TreasuryBondReturn"):
         "years": df["Year"].to_numpy(dtype=int),
         "stock_returns": df["StockReturn"].to_numpy(dtype=float),
         "bond_returns": df[bond_column].to_numpy(dtype=float),
+        "inflation_rates": df["InflationRate"].to_numpy(dtype=float),
         "tbill_returns": df["TBillReturn"].to_numpy(dtype=float),
         "treasury_bond_returns": df["TreasuryBondReturn"].to_numpy(dtype=float),
         "corporate_bond_returns": df["CorporateBondReturn"].to_numpy(dtype=float),
@@ -333,18 +376,25 @@ def run_simulation(
         strategy = ConservativeStrategy()
 
     # Default cash interest to inflation if not specified (Real return = 0%)
-    if cash_interest_rate is None:
-        cash_interest_rate = inflation_rate
+    cash_returns_match_inflation = cash_interest_rate is None
 
     # Pre-calculate Market Scenarios (Matrix of shape: years x n_paths)
     # This separates market generation from portfolio logic
     market_returns_matrix = market_model.simulate_matrix(years, n_paths)
     if isinstance(market_returns_matrix, dict):
         stock_returns_matrix = market_returns_matrix["stock"]
-        bond_returns_matrix = market_returns_matrix["bond"]
+        bond_returns_matrix = market_returns_matrix.get(
+            "bond",
+            np.zeros_like(stock_returns_matrix),
+        )
+        inflation_matrix = market_returns_matrix.get(
+            "inflation",
+            np.full_like(stock_returns_matrix, float(inflation_rate)),
+        )
     else:
         stock_returns_matrix = market_returns_matrix
         bond_returns_matrix = np.zeros_like(stock_returns_matrix)
+        inflation_matrix = np.full_like(stock_returns_matrix, float(inflation_rate))
 
     bond_allocation_pct = min(max(bond_allocation_pct, 0.0), 1.0)
     has_bond_sleeve = bond_allocation_pct > 0.0
@@ -379,6 +429,7 @@ def run_simulation(
     withdrawals_from_equity = np.zeros((years, n_paths))
     withdrawals_from_bonds = np.zeros((years, n_paths))
     replenishments = np.zeros((years, n_paths))
+    inflation_rates = np.zeros((years, n_paths))
     
     # Reset Arrays
     current_equity = np.full(n_paths, float(initial_equity))
@@ -394,6 +445,8 @@ def run_simulation(
         # Retrieve pre-calculated return for this year
         market_return_nominal = stock_returns_matrix[t-1, :]
         bond_return_nominal = bond_returns_matrix[t-1, :]
+        inflation_nominal = inflation_matrix[t-1, :]
+        inflation_rates[t-1, :] = inflation_nominal
             
         # Store NOMINAL market return for analysis/display if needed, 
         # but use REAL return for portfolio growth
@@ -404,11 +457,12 @@ def run_simulation(
         market_peak = np.maximum(market_peak, market_index)
         
         # Convert to REAL Return: (1 + r_nom) / (1 + i) - 1
-        real_market_return = (1 + market_return_nominal) / (1 + inflation_rate) - 1
-        real_bond_return = (1 + bond_return_nominal) / (1 + inflation_rate) - 1
+        real_market_return = (1 + market_return_nominal) / (1 + inflation_nominal) - 1
+        real_bond_return = (1 + bond_return_nominal) / (1 + inflation_nominal) - 1
         
         # Real Cash Return
-        real_cash_return = (1.0 + cash_interest_rate) / (1.0 + inflation_rate) - 1.0
+        cash_return_nominal = inflation_nominal if cash_returns_match_inflation else cash_interest_rate
+        real_cash_return = (1.0 + cash_return_nominal) / (1.0 + inflation_nominal) - 1.0
 
         # 2. Update Asset Values (Real Terms)
         current_equity = np.maximum(0.0, current_equity * (1 + real_market_return))
@@ -638,6 +692,7 @@ def run_simulation(
         'equity_values': equity_values,
         'bond_values': bond_values,
         'market_returns': market_returns,
+        'inflation_rates': inflation_rates,
         'panic_flags': panic_flags,
         'withdrawals_from_cash': withdrawals_from_cash,
         'withdrawals_from_bonds': withdrawals_from_bonds,

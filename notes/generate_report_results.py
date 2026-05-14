@@ -29,8 +29,8 @@ RESULTS_PATH = ASSET_DIR / "bond_report_results.json"
 BASE = 1_000_000
 YEARS = 30
 PANIC_THRESHOLD = -0.15
-INFLATION_RATE = 0.03
-CASH_RATE = 0.03
+FALLBACK_INFLATION_RATE = 0.03
+CASH_RATE = None
 N_PATHS = 20_000
 BLOCK_SIZE = 5
 SEED = 20260513
@@ -79,12 +79,17 @@ def summarize(results: dict, target_spend: float, floor_spend: float) -> dict:
 
 def run_stock_simulation(
     stock_returns: np.ndarray,
+    inflation_rates: np.ndarray,
     spending_cap_pct: float,
     buffer_years: int,
     block_size: int = BLOCK_SIZE,
 ) -> dict:
     target_spend, floor_spend = derive_spending_targets(BASE, spending_cap_pct, FLOOR_RATIO)
-    market = BlockBootstrapMarket(stock_returns, block_size=block_size)
+    market = BlockBootstrapMarket(
+        stock_returns,
+        block_size=block_size,
+        inflation_rates=inflation_rates,
+    )
     np.random.seed(SEED)
     results = run_simulation(
         initial_net_worth=BASE,
@@ -93,7 +98,7 @@ def run_stock_simulation(
         buffer_years=buffer_years,
         years=YEARS,
         panic_threshold=PANIC_THRESHOLD,
-        inflation_rate=INFLATION_RATE,
+        inflation_rate=FALLBACK_INFLATION_RATE,
         n_paths=N_PATHS,
         market_model=market,
         spending_cap_pct=spending_cap_pct,
@@ -117,6 +122,7 @@ def run_bond_simulation(
     market = PairedBlockBootstrapMarket(
         stock_returns=asset_history["stock_returns"],
         bond_returns=asset_history["bond_returns"],
+        inflation_rates=asset_history["inflation_rates"],
         block_size=BLOCK_SIZE,
     )
     np.random.seed(SEED)
@@ -127,7 +133,7 @@ def run_bond_simulation(
         buffer_years=0,
         years=YEARS,
         panic_threshold=PANIC_THRESHOLD,
-        inflation_rate=INFLATION_RATE,
+        inflation_rate=FALLBACK_INFLATION_RATE,
         n_paths=N_PATHS,
         market_model=market,
         spending_cap_pct=spending_cap_pct,
@@ -142,6 +148,7 @@ def main() -> None:
     ASSET_DIR.mkdir(parents=True, exist_ok=True)
     baseline_assets = get_stock_bond_data(history_years=75)
     stock_returns = baseline_assets["stock_returns"]
+    inflation_rates = baseline_assets["inflation_rates"]
 
     safe_withdrawal_rows = []
     for spending_cap_pct in [pct / 100 for pct in range(4, 11)]:
@@ -151,13 +158,27 @@ def main() -> None:
             "target_spending_pct_initial": spending_cap_pct,
             "floor_spending_pct_initial": floor_spend / BASE,
         }
-        row.update(run_stock_simulation(stock_returns, spending_cap_pct, buffer_years=0))
+        row.update(
+            run_stock_simulation(
+                stock_returns,
+                inflation_rates,
+                spending_cap_pct,
+                buffer_years=0,
+            )
+        )
         safe_withdrawal_rows.append(row)
 
     cash_rows = []
     for buffer_years in [0, 1, 2, 3, 5]:
         row = {"buffer_years": buffer_years}
-        row.update(run_stock_simulation(stock_returns, BASELINE_SPENDING_CAP_PCT, buffer_years))
+        row.update(
+            run_stock_simulation(
+                stock_returns,
+                inflation_rates,
+                BASELINE_SPENDING_CAP_PCT,
+                buffer_years,
+            )
+        )
         cash_rows.append(row)
 
     history_rows = []
@@ -171,6 +192,7 @@ def main() -> None:
         row.update(
             run_stock_simulation(
                 asset_history["stock_returns"],
+                asset_history["inflation_rates"],
                 BASELINE_SPENDING_CAP_PCT,
                 buffer_years=0,
             )
@@ -183,6 +205,7 @@ def main() -> None:
         row.update(
             run_stock_simulation(
                 stock_returns,
+                inflation_rates,
                 BASELINE_SPENDING_CAP_PCT,
                 buffer_years=0,
                 block_size=block_size,
@@ -232,14 +255,17 @@ def main() -> None:
             "floor_ratio": FLOOR_RATIO,
             "years": YEARS,
             "panic_threshold": PANIC_THRESHOLD,
-            "inflation_rate": INFLATION_RATE,
+            "fallback_inflation_rate": FALLBACK_INFLATION_RATE,
             "cash_interest_rate": CASH_RATE,
+            "cash_return_source": "Cash return matches sampled inflation, so cash earns 0% real return.",
             "n_paths": N_PATHS,
             "block_size_years": BLOCK_SIZE,
             "seed": SEED,
-            "data_source": "historical_asset_returns.csv",
+            "return_data_source": "historical_asset_returns.csv",
+            "inflation_data_source": "historical_inflation.csv",
             "stock_return_source": "Damodaran S&P 500 total return (StockReturn; dividends reinvested)",
             "bond_return_source": "Damodaran TreasuryBondReturn",
+            "inflation_source": "FRED CPIAUCNS, December-to-December CPI-U inflation",
             "baseline_start_year": int(baseline_assets["years"][0]),
             "baseline_end_year": int(baseline_assets["years"][-1]),
         },
