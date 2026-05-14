@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Retirement Portfolio Allocation Report</title>
-  <meta name="description" content="A retirement allocation report separating ruin, target shortfall, floor breach, and ending wealth under flexible spending rules.">
-  <meta property="og:title" content="Retirement Portfolio Allocation Report">
-  <meta property="og:description" content="Cash, bonds, spending caps, and flexible retirement withdrawals tested with historical block bootstrap.">
+  <title>A Retirement Plan That Breaks The 60/40 Story</title>
+  <meta name="description" content="A retirement allocation report stress-testing 60/40 and the 4% rule against mandatory and discretionary spending needs.">
+  <meta property="og:title" content="A Retirement Plan That Breaks The 60/40 Story">
+  <meta property="og:description" content="A realistic target-and-floor retirement spending model that challenges the traditional 60/40 plus 4% rule framing.">
   <meta property="og:type" content="article">
   <meta property="og:image" content="assets/bond_report_objective_tradeoff.png">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -253,11 +253,28 @@
       margin: 22px 0;
     }
 
+    .story-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 22px;
+      margin: 26px 0;
+    }
+
     .note-card {
       background: rgba(255, 255, 255, 0.72);
       border: 1px solid var(--line);
       border-radius: var(--radius);
       padding: 20px;
+    }
+
+    .note-card .label {
+      color: var(--muted);
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+      text-transform: uppercase;
     }
 
     .note-card b {
@@ -359,7 +376,8 @@
     @media (max-width: 920px) {
       .hero,
       .layout,
-      .grid-two {
+      .grid-two,
+      .story-grid {
         grid-template-columns: 1fr;
       }
 
@@ -408,38 +426,38 @@
     <header class="hero">
       <div>
         <p class="eyebrow">Retirement Planning Report · May 13, 2026</p>
-        <h1>Cash, Bonds, And The Real Retirement Objective</h1>
-        <p class="dek">A flexible spending simulation that separates literal ruin from target shortfall, floor breach, and ending wealth.</p>
+        <h1>A Retirement Plan That Breaks The 60/40 Story</h1>
+        <p class="dek">A retiree with a few million dollars does not have one spending number. They have mandatory expenses, discretionary lifestyle, and the ability to downshift. That changes the portfolio question.</p>
       </div>
       <aside class="hero-panel">
         <img src="assets/bond_report_objective_tradeoff.png" alt="Objective tradeoff chart showing higher bond allocations moving toward higher target shortfall and lower median wealth.">
-        <p class="caption">The bond decision is not just about ruin. In this model, more bonds moved the portfolio toward more target shortfall and lower median ending wealth.</p>
+        <p class="caption">The traditional 60/40 argument focuses on avoiding ruin. This model asks whether the portfolio also protects the retiree's target lifestyle.</p>
       </aside>
     </header>
 
     <div class="metric-strip" aria-label="Key findings">
       <div class="metric">
-        <strong>0.40%</strong>
-        <span>ruin rate for the 5% target, zero-cash, zero-bond baseline</span>
+        <strong>0.00%</strong>
+        <span>ruin rate for the classic 4% target with 60/40</span>
       </div>
       <div class="metric">
-        <strong>19.60%</strong>
-        <span>target-shortfall path-years in the same baseline</span>
+        <strong>18.51%</strong>
+        <span>target-shortfall path-years for that same 4% 60/40 plan</span>
       </div>
       <div class="metric">
-        <strong>47.84%</strong>
-        <span>target-shortfall path-years with 60% bonds</span>
+        <strong>2.47x</strong>
+        <span>median ending wealth for 4% 60/40</span>
       </div>
       <div class="metric">
         <strong>4.11x</strong>
-        <span>baseline median ending wealth as a multiple of starting portfolio</span>
+        <span>median ending wealth for the 5% stock-only flexible baseline</span>
       </div>
     </div>
 
     <div class="layout">
       <nav aria-label="Report sections">
         <a href="#summary">Summary</a>
-        <a href="#setup">Setup</a>
+        <a href="#setup">Scenario</a>
         <a href="#cash">1. Cash Buffer</a>
         <a href="#history">2. History Window</a>
         <a href="#withdrawal">3. Withdrawal Search</a>
@@ -451,12 +469,27 @@
 
       <main>
         <section id="summary">
-          <h2>Executive Summary</h2>
-          <p class="lead">Under this flexible spending rule, large permanent cash and bond allocations did not improve the chosen objective. They mostly traded a small reduction in ruin and floor-breach risk for more target shortfall and lower median ending wealth.</p>
-          <p>The core idea is simple: do not optimize retirement portfolios only around “ruin.” Ruin matters, but so do target lifestyle reliability, floor protection, and long-term wealth.</p>
+          <h2>The Story</h2>
+          <p class="lead">Imagine someone retiring with a portfolio of a few million dollars. Some spending is mandatory: food, basic housing, utilities, insurance, taxes, and health care. Other spending is discretionary: travel, nicer housing, gifts, upgrades, and the parts of life that make retirement feel abundant.</p>
+          <p>That budget naturally creates two retirement objectives. The <b>target</b> is the preferred lifestyle. The <b>floor</b> is the minimum acceptable lifestyle. A target shortfall means vacations, upgrades, or housing choices get cut. A floor breach means the mandatory budget is no longer supported.</p>
+          <p>This report stress-tests the traditional advice of a 60/40 portfolio and the 4% rule against that target-and-floor reality. The finding is direct: under this flexible spending objective, the generic 60/40 answer solves the easy metric, literal ruin, while weakening the harder objective, maintaining the target lifestyle.</p>
           <div class="callout">
-            <b>Defensible bottom line:</b> for a retiree who can flex from a 5% target to a 2.5% floor, broad equity exposure is hard to beat in this model unless bonds are being used for a specific liability, behavioral need, or guaranteed-income strategy.
+            <b>What breaks:</b> the traditional 60/40 plus 4% framing treats "not running out of money" as the whole problem. For a retiree who can downsize discretionary spending, ruin is not the only risk. The larger day-to-day risk is spending too many years below the target lifestyle.
           </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Benchmark</th><th>Target / floor</th><th>Bonds</th><th>Ruin</th><th>Target shortfall</th><th>Final median</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>4% stock-only</td><td>4% / 2%</td><td>0%</td><td>0.04%</td><td>14.83%</td><td>5.19x</td></tr>
+                <tr><td>Traditional 4% 60/40</td><td>4% / 2%</td><td>40%</td><td>0.00%</td><td>18.51%</td><td>2.47x</td></tr>
+                <tr><td>5% stock-only flexible baseline</td><td>5% / 2.5%</td><td>0%</td><td>0.40%</td><td>19.60%</td><td>4.11x</td></tr>
+                <tr><td>5% 60/40</td><td>5% / 2.5%</td><td>40%</td><td>0.00%</td><td>29.27%</td><td>1.75x</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>The classic 4% 60/40 plan looks safe if the only question is ruin. But it has more target-shortfall years and less than half the median ending wealth of the 4% stock-only plan. It also delivers a lower target lifestyle than the 5% stock-only baseline while ending with much less wealth.</p>
           <div>
             <span class="tag"><span class="dot red"></span>Red: target shortfall</span>
             <span class="tag"><span class="dot green"></span>Green: floor breach</span>
@@ -466,8 +499,18 @@
         </section>
 
         <section id="setup">
-          <h2>Setup And Spending Rule</h2>
-          <p>The report uses percentage rules rather than one hardcoded starting portfolio. The baseline target is 5% of the initial portfolio, inflation-adjusted. The minimum floor is half of target spending, or 2.5% of the initial portfolio.</p>
+          <h2>Scenario And Spending Rule</h2>
+          <div class="story-grid">
+            <div class="note-card">
+              <span class="label">Mandatory spending</span>
+              <p>Food, basic housing, utilities, insurance, taxes, health care, and other expenses that cannot be cut without changing the retiree's minimum acceptable life.</p>
+            </div>
+            <div class="note-card">
+              <span class="label">Discretionary spending</span>
+              <p>Vacations, nicer housing, upgrades, gifts, and other spending that can be reduced when markets are bad without immediately creating ruin.</p>
+            </div>
+          </div>
+          <p>The report converts that real-world budget into percentage rules rather than one hardcoded starting portfolio. The baseline target is 5% of the initial portfolio, inflation-adjusted. The minimum floor is half of target spending, or 2.5% of the initial portfolio.</p>
           <div class="table-wrap">
             <table>
               <thead>
@@ -609,8 +652,8 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
         </section>
 
         <section id="bonds">
-          <h2>Experiment 5: Bonds</h2>
-          <p>This experiment removes the cash buffer and varies the bond allocation from 0% to 60% of the non-cash portfolio. Bonds are modeled as 10-year Treasury total returns, paired with stock returns from the same historical blocks.</p>
+          <h2>Experiment 5: Bonds And 60/40</h2>
+          <p>This experiment removes the cash buffer and varies the bond allocation from 0% to 60% of the non-cash portfolio. Bonds are modeled as 10-year Treasury total returns, paired with stock returns from the same historical blocks. The 40% bond row is the traditional 60/40 portfolio.</p>
           <div class="table-wrap">
             <table>
               <thead>
@@ -627,7 +670,7 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
           </div>
           <figure class="figure">
             <img src="assets/bond_report_bond_allocation.png" alt="Bond allocation tradeoff chart.">
-            <figcaption>More bonds drive ruin and floor breach toward zero, but target shortfall rises and ending wealth falls.</figcaption>
+            <figcaption>60/40 already worsens target shortfall and ending wealth in this model; 40/60 makes that tradeoff extreme.</figcaption>
           </figure>
           <div class="grid-two">
             <div class="note-card">
@@ -661,9 +704,9 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
 
         <section id="interpretation">
           <h2>Interpretation</h2>
-          <p>The traditional allocation argument says bonds reduce sequence risk. That is true, but incomplete. This spending rule already cuts spending before the portfolio is exhausted. Once that is true, the value of extra defensive allocation falls in this model.</p>
-          <blockquote>Under this flexible spending rule, large permanent cash and bond allocations did not improve the chosen objective. They mainly traded a small reduction in ruin and floor risk for more target shortfall and lower median wealth.</blockquote>
-          <p>This report does not prove bonds are useless. It says the case for bonds has to be specific: liability matching, guaranteed-income design, or behavioral constraints. A generic permanent bond-heavy allocation did not improve the modeled objective.</p>
+          <p>The traditional allocation argument says bonds reduce sequence risk. That is true, but incomplete. This spending rule already cuts discretionary spending before the portfolio is exhausted. Once that is true, the value of extra defensive allocation falls in this model.</p>
+          <blockquote>For this flexible-spending retiree, the generic 60/40 plus 4% recommendation breaks: it protects against an already-small ruin risk while giving up too much target lifestyle reliability and compounding.</blockquote>
+          <p>This report does not prove bonds are useless. It says the case for bonds has to be specific: liability matching, guaranteed-income design, or behavioral constraints. A generic permanent 60/40 allocation did not improve the modeled objective.</p>
         </section>
 
         <section id="limits">

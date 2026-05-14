@@ -104,10 +104,14 @@ def run_stock_simulation(
     return summarize(results, target_spend=target_spend, floor_spend=floor_spend)
 
 
-def run_bond_simulation(asset_history: dict, bond_pct: float) -> dict:
+def run_bond_simulation(
+    asset_history: dict,
+    bond_pct: float,
+    spending_cap_pct: float = BASELINE_SPENDING_CAP_PCT,
+) -> dict:
     target_spend, floor_spend = derive_spending_targets(
         BASE,
-        BASELINE_SPENDING_CAP_PCT,
+        spending_cap_pct,
         FLOOR_RATIO,
     )
     market = PairedBlockBootstrapMarket(
@@ -126,7 +130,7 @@ def run_bond_simulation(asset_history: dict, bond_pct: float) -> dict:
         inflation_rate=INFLATION_RATE,
         n_paths=N_PATHS,
         market_model=market,
-        spending_cap_pct=BASELINE_SPENDING_CAP_PCT,
+        spending_cap_pct=spending_cap_pct,
         cash_interest_rate=CASH_RATE,
         strategy=ConservativeStrategy(),
         bond_allocation_pct=bond_pct,
@@ -192,6 +196,34 @@ def main() -> None:
         row.update(run_bond_simulation(baseline_assets, bond_pct))
         bond_rows.append(row)
 
+    traditional_benchmark_rows = []
+    for spending_cap_pct, bond_pct, label in [
+        (0.04, 0.0, "4% stock-only"),
+        (0.04, 0.4, "4% 60/40"),
+        (0.05, 0.0, "5% stock-only"),
+        (0.05, 0.4, "5% 60/40"),
+    ]:
+        target_spend, floor_spend = derive_spending_targets(
+            BASE,
+            spending_cap_pct,
+            FLOOR_RATIO,
+        )
+        row = {
+            "label": label,
+            "spending_cap_pct": spending_cap_pct,
+            "target_spending_pct_initial": spending_cap_pct,
+            "floor_spending_pct_initial": floor_spend / BASE,
+            "bond_pct": bond_pct,
+        }
+        row.update(
+            run_bond_simulation(
+                baseline_assets,
+                bond_pct=bond_pct,
+                spending_cap_pct=spending_cap_pct,
+            )
+        )
+        traditional_benchmark_rows.append(row)
+
     results = {
         "settings": {
             "base_initial_net_worth": BASE,
@@ -216,6 +248,7 @@ def main() -> None:
         "cash_rows": cash_rows,
         "history_rows": history_rows,
         "block_size_rows": block_size_rows,
+        "traditional_benchmark_rows": traditional_benchmark_rows,
         "bond_rows": bond_rows,
         "stock_bond_years": [
             int(baseline_assets["years"][0]),

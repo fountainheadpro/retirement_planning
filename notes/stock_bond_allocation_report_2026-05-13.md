@@ -1,10 +1,21 @@
-# Stock, Cash, And Bond Allocation Experiment
+# A Retirement Plan That Breaks The 60/40 Story
 
 *Date: May 13, 2026*
 
 ## Executive Summary
 
-This report tests whether cash buffers or Treasury bonds improve a flexible retirement spending plan.
+This report starts with a realistic retiree rather than an abstract withdrawal rate.
+
+Imagine someone retiring with a portfolio of a few million dollars. Some spending is mandatory: food, basic housing, utilities, insurance, taxes, health care, and the baseline costs of staying independent. Other spending is discretionary: vacations, nicer housing, gifts, upgrades, and the parts of retirement that make life feel abundant.
+
+That budget naturally creates two retirement objectives:
+
+- **Target spending:** the preferred lifestyle, including mandatory and discretionary spending.
+- **Floor spending:** the minimum acceptable lifestyle, focused on mandatory spending.
+
+This distinction matters because the traditional advice of a **60/40 portfolio and the 4% rule** treats "not running out of money" as the main objective. That is too narrow. A retiree can avoid ruin and still spend too many years below the lifestyle target.
+
+This report stress-tests the traditional 60/40 plus 4% framing against a target-and-floor spending model. The finding is direct: under this flexible spending objective, the generic 60/40 answer solves the easy metric, literal ruin, while weakening the harder objective, maintaining the target lifestyle.
 
 The setup is now expressed as a percentage rule, not as one hardcoded starting portfolio:
 
@@ -34,6 +45,17 @@ Because the model has no taxes, fees, fixed-dollar expenses, or account limits, 
 
 The main result: under this flexible spending rule, large permanent cash and bond allocations did not improve the chosen objective. They mostly traded a small reduction in ruin and floor-breach risk for more target shortfall and lower median ending wealth. A 60% bond portfolio eliminated ruin in this run, but target shortfall rose to 47.84% of simulated path-years and median ending wealth fell below the starting portfolio.
 
+The direct traditional benchmark makes the problem clearer:
+
+| Benchmark | Target / floor | Bonds | Ruin | Target shortfall | Final median |
+|---|---:|---:|---:|---:|---:|
+| 4% stock-only | 4% / 2% | 0% | 0.04% | 14.83% | 5.19x |
+| Traditional 4% 60/40 | 4% / 2% | 40% | 0.00% | 18.51% | 2.47x |
+| 5% stock-only flexible baseline | 5% / 2.5% | 0% | 0.40% | 19.60% | 4.11x |
+| 5% 60/40 | 5% / 2.5% | 40% | 0.00% | 29.27% | 1.75x |
+
+The classic 4% 60/40 plan looks safe if the only question is ruin. But it has more target-shortfall years and less than half the median ending wealth of the 4% stock-only plan. It also delivers a lower target lifestyle than the 5% stock-only baseline while ending with much less wealth.
+
 The safe-withdrawal sweep gives useful context for the 5% baseline. With zero cash and zero bonds, a 4% target is very robust. A 5% target still keeps ruin and floor breach low. At 6%, measurable failure risk starts to appear. From 7% upward, the target becomes increasingly aggressive, and by 9-10% the plan is no longer close to safe under this model.
 
 The tables report two decimal places for reproducibility, not because the second decimal place is economically meaningful. The larger uncertainty is model uncertainty: historical sample, block size, inflation treatment, asset data source, bond duration, and future regime.
@@ -47,6 +69,8 @@ The simulator separates three outcomes that are easy to blur together:
 - **Floor breach:** a simulated year has withdrawals below the minimum floor.
 
 That distinction is central. Ruin is catastrophic. Floor breach means the plan cannot support even the reduced lifestyle. Target shortfall is softer: the household is still spending above the floor, but below the preferred lifestyle target.
+
+In plain household terms, target shortfall means the discretionary layer gets cut: fewer trips, less housing flexibility, fewer upgrades, fewer gifts, or delayed optional spending. Floor breach means the mandatory layer is no longer fully funded.
 
 The spending rule itself creates target shortfall before the portfolio is ruined. If the portfolio falls below its starting value, a 5% current-portfolio cap allows less than the original 5% target.
 
@@ -260,9 +284,11 @@ Terminology matters:
 - **60/40** usually means 60% stocks and 40% bonds.
 - **40/60** means 40% stocks and 60% bonds.
 
-This report tests 0%, 10%, 20%, 40%, and 60% bond allocations. The strongest evidence is against the 60% bond case. The 40% bond case is also worse than 0% bonds on target shortfall and median wealth, but it is not as extreme.
+This report tests 0%, 10%, 20%, 40%, and 60% bond allocations. The 40% bond case is the traditional 60/40 portfolio. The strongest evidence is against the 60% bond case, but the 40% bond case is also worse than 0% bonds on target shortfall and median wealth in this model.
 
-The defensible conclusion is narrower than "bonds are bad." Under this flexible spending rule, large permanent cash and bond allocations did not improve the chosen objective. They mainly traded a small reduction in already-low ruin/floor risk for more target shortfall and lower long-term wealth.
+The conclusion is sharper than the prior version of this report: for this flexible-spending retiree, the generic 60/40 plus 4% recommendation breaks. It protects against an already-small ruin risk while giving up too much target lifestyle reliability and compounding.
+
+The defensible conclusion is still narrower than "bonds are bad." Under this flexible spending rule, large permanent cash and bond allocations did not improve the chosen objective. They mainly traded a small reduction in already-low ruin/floor risk for more target shortfall and lower long-term wealth.
 
 It also weakens several common defenses of bond-heavy advice.
 
@@ -312,7 +338,7 @@ For a retiree who can downshift spending from 5% of initial wealth to a 2.5% flo
 
 The sharper conclusion is:
 
-> Under this flexible spending rule, large permanent cash and bond allocations did not improve the chosen objective. They mainly traded a small reduction in ruin/floor risk for more target shortfall and lower median wealth.
+> For this flexible-spending retiree, the generic 60/40 plus 4% recommendation breaks: it protects against an already-small ruin risk while giving up too much target lifestyle reliability and compounding.
 
 ## Practical Takeaways
 
