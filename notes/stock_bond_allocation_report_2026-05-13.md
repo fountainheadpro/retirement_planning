@@ -27,7 +27,7 @@ The setup is now expressed as a percentage rule, not as one hardcoded starting p
 - Cash return: **3% nominal**, so cash earns roughly 0% real return.
 - Simulations: **20,000 Monte Carlo paths**.
 - Market model: **5-year historical block bootstrap**.
-- Return source: **Damodaran annual stock, T-bill, and bond returns**.
+- Return source: **Damodaran annual S&P 500 total returns with dividends reinvested, T-bill returns, and bond total returns**.
 - Main lookback window: **75 years**, excluding the Great Depression while retaining major modern drawdowns.
 
 The percentage rule maps to these concrete examples:
@@ -114,19 +114,19 @@ The method works like this:
 
 The reason for using blocks is that market returns are not independent year to year. Real markets have clusters: crashes, recoveries, inflationary periods, high-return stretches, and sideways periods. Sampling 5-year blocks preserves some of that sequence structure.
 
-For stock-only tests, the bootstrap samples Damodaran's annual S&P 500 stock-return series. For stock/bond tests, the model uses **paired block bootstrap**: stocks and bonds are sampled from the same historical years in the same 5-year blocks. That matters because bonds should not be modeled as an independent random return stream. Their value depends on the same macro regime that produced the stock return.
+For stock-only tests, the bootstrap samples Damodaran's annual S&P 500 total-return series, including dividends reinvested. For stock/bond tests, the model uses **paired block bootstrap**: stocks and bonds are sampled from the same historical years in the same 5-year blocks. That matters because bonds should not be modeled as an independent random return stream. Their value depends on the same macro regime that produced the stock return.
 
-The stock/bond data comes from Aswath Damodaran's annual return dataset, using S&P 500 returns and 10-year Treasury bond total returns:
+The stock/bond data comes from Aswath Damodaran's annual return dataset, using S&P 500 total returns with dividends reinvested and 10-year Treasury bond total returns:
 
 - https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histretSP.html
 
-For the main comparison, the paired history covers **1951-2025**. All report experiments use this same Damodaran stock-return source unless a table explicitly changes the lookback window. That is why the 5% zero-cash stock-only baseline now matches the 0% bond row in the bond experiment.
+For the main comparison, the paired history covers **1951-2025**. All report experiments use this same Damodaran S&P 500 total-return source unless a table explicitly changes the lookback window. That is why the 5% zero-cash stock-only baseline now matches the 0% bond row in the bond experiment.
 
 The chart assets are generated from `notes/assets/bond_report_results.json` by `notes/generate_report_assets.py`.
 
 ## Experiment 1: Cash Buffer
 
-This experiment varies the cash buffer from 0 to 5 years of target spending. The portfolio is otherwise invested in stocks, using the 75-year Damodaran S&P 500 stock-return lookback.
+This experiment varies the cash buffer from 0 to 5 years of target spending. The portfolio is otherwise invested in the Damodaran S&P 500 total-return series, which includes dividends reinvested, using the 75-year lookback window.
 
 | Cash buffer | Ruin | Target shortfall | Floor breach | Final p10 | Final median |
 |---:|---:|---:|---:|---:|---:|
@@ -150,7 +150,7 @@ This is the key setup decision for the rest of the report: use zero cash buffer 
 
 ## Experiment 2: Historical Window Sensitivity
 
-This experiment keeps the same 5% target and 2.5% floor, with no cash buffer, and changes the stock-return lookback window.
+This experiment keeps the same 5% target and 2.5% floor, with no cash buffer, and changes the S&P 500 total-return lookback window.
 
 | History window | Ruin | Target shortfall | Floor breach | Final p10 | Final median |
 |---:|---:|---:|---:|---:|---:|
@@ -174,7 +174,7 @@ After the cash-buffer experiment, the working assumption is zero cash buffer. Th
 
 - zero cash buffer,
 - zero bonds,
-- 75-year Damodaran stock-return block bootstrap,
+- 75-year Damodaran S&P 500 total-return block bootstrap,
 - target spending equal to the listed cap,
 - minimum floor equal to 50% of that target.
 
@@ -212,7 +212,7 @@ For example, at the 5% target, 19.60% of all simulated path-years are below targ
 
 ## Experiment 4: Block Size Sensitivity
 
-This experiment keeps the 5% target, 2.5% floor, zero cash, zero bonds, and 75-year Damodaran stock history. It changes only the bootstrap block size.
+This experiment keeps the 5% target, 2.5% floor, zero cash, zero bonds, and 75-year Damodaran S&P 500 total-return history. It changes only the bootstrap block size.
 
 | Block size | Ruin | Target shortfall | Floor breach | Final p10 | Final median |
 |---:|---:|---:|---:|---:|---:|
@@ -225,9 +225,9 @@ The direction of the result is not dependent on the exact 5-year block choice, b
 
 ## Experiment 5: Bonds
 
-This experiment removes the cash buffer and varies the bond allocation from 0% to 60% of the non-cash portfolio. Bonds are modeled as 10-year Treasury total returns, paired with stock returns from the same historical blocks.
+This experiment removes the cash buffer and varies the bond allocation from 0% to 60% of the non-cash portfolio. Bonds are modeled as 10-year Treasury total returns, paired with S&P 500 total returns from the same historical blocks.
 
-Because this experiment uses the same Damodaran stock series as the stock-only experiments, the 0% bond row matches the 5% zero-cash baseline above.
+Because this experiment uses the same Damodaran S&P 500 total-return series as the stock-only experiments, the 0% bond row matches the 5% zero-cash baseline above.
 
 | Bond allocation | Ruin | Target shortfall | Floor breach | Final p10 | Final median |
 |---:|---:|---:|---:|---:|---:|

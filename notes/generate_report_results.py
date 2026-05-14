@@ -238,7 +238,7 @@ def main() -> None:
             "block_size_years": BLOCK_SIZE,
             "seed": SEED,
             "data_source": "historical_asset_returns.csv",
-            "stock_return_source": "Damodaran StockReturn",
+            "stock_return_source": "Damodaran S&P 500 total return (StockReturn; dividends reinvested)",
             "bond_return_source": "Damodaran TreasuryBondReturn",
             "baseline_start_year": int(baseline_assets["years"][0]),
             "baseline_end_year": int(baseline_assets["years"][-1]),

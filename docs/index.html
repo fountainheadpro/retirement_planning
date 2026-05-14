@@ -541,13 +541,13 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
           </figure>
 
           <h3>Model</h3>
-          <p>The simulations use 20,000 Monte Carlo paths, annual returns, fixed 3% inflation, and historical block bootstrap. The main lookback window is 1951-2025 from Aswath Damodaran’s annual return dataset.</p>
+          <p>The simulations use 20,000 Monte Carlo paths, annual returns, fixed 3% inflation, and historical block bootstrap. The main lookback window is 1951-2025 from Aswath Damodaran’s annual return dataset, using the S&amp;P 500 total-return series with dividends reinvested.</p>
           <p>For stock/bond tests, the model uses paired block bootstrap: stock and bond returns are sampled from the same historical years in the same 5-year blocks.</p>
         </section>
 
         <section id="cash">
           <h2>Experiment 1: Cash Buffer</h2>
-          <p>This experiment varies the cash buffer from 0 to 5 years of target spending. The portfolio is otherwise invested in stocks, using the 75-year Damodaran S&amp;P 500 stock-return lookback.</p>
+          <p>This experiment varies the cash buffer from 0 to 5 years of target spending. The portfolio is otherwise invested in the Damodaran S&amp;P 500 total-return series, which includes dividends reinvested, using the 75-year lookback window.</p>
           <div class="table-wrap">
             <table>
               <thead>
@@ -571,7 +571,7 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
 
         <section id="history">
           <h2>Experiment 2: Historical Window Sensitivity</h2>
-          <p>This experiment keeps the 5% target, 2.5% floor, and no cash buffer. It changes only the stock-return lookback window.</p>
+          <p>This experiment keeps the 5% target, 2.5% floor, and no cash buffer. It changes only the S&amp;P 500 total-return lookback window.</p>
           <div class="table-wrap">
             <table>
               <thead>
@@ -634,7 +634,7 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
 
         <section id="block-size">
           <h2>Experiment 4: Block Size Sensitivity</h2>
-          <p>This experiment keeps the 5% target, 2.5% floor, zero cash, zero bonds, and 75-year Damodaran stock history. It changes only the bootstrap block size.</p>
+          <p>This experiment keeps the 5% target, 2.5% floor, zero cash, zero bonds, and 75-year Damodaran S&amp;P 500 total-return history. It changes only the bootstrap block size.</p>
           <div class="table-wrap">
             <table>
               <thead>
@@ -653,7 +653,7 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
 
         <section id="bonds">
           <h2>Experiment 5: Bonds And 60/40</h2>
-          <p>This experiment removes the cash buffer and varies the bond allocation from 0% to 60% of the non-cash portfolio. Bonds are modeled as 10-year Treasury total returns, paired with stock returns from the same historical blocks. The 40% bond row is the traditional 60/40 portfolio.</p>
+          <p>This experiment removes the cash buffer and varies the bond allocation from 0% to 60% of the non-cash portfolio. Bonds are modeled as 10-year Treasury total returns, paired with S&amp;P 500 total returns from the same historical blocks. The 40% bond row is the traditional 60/40 portfolio.</p>
           <div class="table-wrap">
             <table>
               <thead>
