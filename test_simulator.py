@@ -5,8 +5,48 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from simulator import run_simulation, calculate_statistics, _source_funds, MeanRevertingMarket, RandomWalkMarket, BlockBootstrapMarket, create_ar_model
+from simulator import (
+    run_simulation,
+    calculate_statistics,
+    _source_funds,
+    MeanRevertingMarket,
+    RandomWalkMarket,
+    BlockBootstrapMarket,
+    PairedBlockBootstrapMarket,
+    create_ar_model,
+    get_stock_bond_data,
+    derive_spending_targets,
+    build_spending_reference_table,
+)
 from strategies import ConservativeStrategy, AggressiveStrategy, NoCashBufferStrategy
+
+
+class TestSpendingTargetDerivation:
+    """Test spending target derivation from initial portfolio and cap."""
+
+    def test_target_and_floor_derive_from_initial_portfolio_cap(self):
+        """A 10% cap on $6M should produce $600k target and $300k floor."""
+        target, floor = derive_spending_targets(
+            initial_net_worth=6_000_000,
+            spending_cap_pct=0.10,
+        )
+
+        assert target == 600_000
+        assert floor == 300_000
+
+    def test_reference_table_uses_standard_portfolio_levels(self):
+        """Reference table should show 5% target and half-cap floor."""
+        rows = build_spending_reference_table()
+
+        assert rows == [
+            {"Portfolio": "$2M", "Target (5%)": "$100,000", "Floor (2.5%)": "$50,000"},
+            {"Portfolio": "$3M", "Target (5%)": "$150,000", "Floor (2.5%)": "$75,000"},
+            {"Portfolio": "$4M", "Target (5%)": "$200,000", "Floor (2.5%)": "$100,000"},
+            {"Portfolio": "$5M", "Target (5%)": "$250,000", "Floor (2.5%)": "$125,000"},
+            {"Portfolio": "$6M", "Target (5%)": "$300,000", "Floor (2.5%)": "$150,000"},
+            {"Portfolio": "$10M", "Target (5%)": "$500,000", "Floor (2.5%)": "$250,000"},
+        ]
+
 
 class TestSourceFunds:
     """Test the fund sourcing logic."""
@@ -263,6 +303,125 @@ class TestRunSimulation:
         # Spending cap limits withdrawal to 4% of ~80k-90k assets (~3.2k-3.6k)
         assert from_cash > 0
         assert from_equity == 0
+
+    def test_minimum_spend_floor_overrides_spending_cap(self):
+        """Minimum spending floor should apply when the percentage cap is lower."""
+        model = RandomWalkMarket(mu=0.0, residuals=np.array([0.0]))
+
+        results = run_simulation(
+            initial_net_worth=6_000_000,
+            annual_spend=300_000,
+            minimum_annual_spend=150_000,
+            buffer_years=0,
+            years=1,
+            panic_threshold=-0.15,
+            inflation_rate=0.0,
+            n_paths=1,
+            market_model=model,
+            spending_cap_pct=0.02,
+        )
+
+        assert results["withdrawal_values"][0, 0] == 150_000
+
+    def test_minimum_spend_floor_cannot_overdraw_portfolio(self):
+        """Minimum spending floor should still be capped by available assets."""
+        model = RandomWalkMarket(mu=0.0, residuals=np.array([0.0]))
+
+        results = run_simulation(
+            initial_net_worth=100_000,
+            annual_spend=300_000,
+            minimum_annual_spend=150_000,
+            buffer_years=0,
+            years=1,
+            panic_threshold=-0.15,
+            inflation_rate=0.0,
+            n_paths=1,
+            market_model=model,
+            spending_cap_pct=0.01,
+        )
+
+        assert results["withdrawal_values"][0, 0] == 100_000
+        assert results["portfolio_values"][1, 0] == 0
+
+    def test_bond_allocation_initializes_from_investable_assets(self):
+        """Bond allocation should split non-cash assets into stocks and bonds."""
+        model = PairedBlockBootstrapMarket(
+            stock_returns=np.array([0.0]),
+            bond_returns=np.array([0.0]),
+            block_size=1,
+        )
+
+        results = run_simulation(
+            initial_net_worth=1_000_000,
+            annual_spend=0,
+            buffer_years=0,
+            years=1,
+            panic_threshold=-0.15,
+            inflation_rate=0.0,
+            n_paths=1,
+            market_model=model,
+            spending_cap_pct=1.0,
+            bond_allocation_pct=0.25,
+        )
+
+        assert results["equity_values"][0, 0] == 750_000
+        assert results["bond_values"][0, 0] == 250_000
+        assert results["portfolio_values"][1, 0] == 1_000_000
+
+    def test_panic_withdrawal_uses_bonds_before_equity(self):
+        """In panic years, bond sleeve should fund withdrawals before stocks."""
+        model = PairedBlockBootstrapMarket(
+            stock_returns=np.array([-0.20]),
+            bond_returns=np.array([0.0]),
+            block_size=1,
+        )
+
+        results = run_simulation(
+            initial_net_worth=1_000_000,
+            annual_spend=100_000,
+            buffer_years=0,
+            years=1,
+            panic_threshold=-0.15,
+            inflation_rate=0.0,
+            n_paths=1,
+            market_model=model,
+            spending_cap_pct=1.0,
+            bond_allocation_pct=0.20,
+        )
+
+        assert results["withdrawals_from_bonds"][0, 0] == 100_000
+        assert results["withdrawals_from_equity"][0, 0] == 0
+
+
+class TestPairedBlockBootstrapMarket:
+    """Test paired stock/bond return sampling."""
+
+    def test_preserves_stock_bond_year_pairings(self):
+        """Sampled stock and bond returns should come from the same historical year."""
+        model = PairedBlockBootstrapMarket(
+            stock_returns=np.array([0.10, 0.20, 0.30]),
+            bond_returns=np.array([0.01, 0.02, 0.03]),
+            block_size=1,
+        )
+
+        np.random.seed(7)
+        matrices = model.simulate_matrix(years=8, n_paths=4)
+        observed_pairs = set(zip(matrices["stock"].ravel(), matrices["bond"].ravel()))
+
+        assert observed_pairs <= {
+            (0.10, 0.01),
+            (0.20, 0.02),
+            (0.30, 0.03),
+        }
+
+    def test_stock_bond_loader_returns_requested_history(self):
+        """Loader should return the latest paired stock and bond history."""
+        data = get_stock_bond_data(history_years=75)
+
+        assert len(data["years"]) == 75
+        assert len(data["stock_returns"]) == 75
+        assert len(data["bond_returns"]) == 75
+        assert data["years"][-1] >= 2024
 
 
 class TestCalculateStatistics:

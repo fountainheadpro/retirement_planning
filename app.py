@@ -2,7 +2,19 @@ import streamlit as st
 import plotly.graph_objects as go
 import numpy as np
 
-from simulator import get_sp500_residuals, run_simulation, calculate_statistics, create_ar_model, RandomWalkMarket, BlockBootstrapMarket, MeanRevertingMarket
+from simulator import (
+    get_sp500_residuals,
+    get_stock_bond_data,
+    run_simulation,
+    calculate_statistics,
+    create_ar_model,
+    derive_spending_targets,
+    build_spending_reference_table,
+    RandomWalkMarket,
+    BlockBootstrapMarket,
+    PairedBlockBootstrapMarket,
+    MeanRevertingMarket,
+)
 from strategies import ConservativeStrategy, AggressiveStrategy, NoCashBufferStrategy
 
 def ordinal(n):
@@ -31,7 +43,7 @@ st.markdown(
         <div class="tooltip" aria-label="How this simulator works">
             ℹ️
             <div class="tooltiptext">
-                Models a retirement portfolio in real (inflation-adjusted) dollars using S&amp;P 500 total-return history. Configure net worth, annual spending, cash buffer and spending cap, panic threshold, inflation and cash rate, then pick Random Walk, Mean Reversion (AR), or Block Bootstrap to run Monte Carlo paths and visualize risk bands.
+                Models a retirement portfolio in real (inflation-adjusted) dollars using historical total-return data. Configure net worth, spending cap, optional defensive allocations, panic threshold, inflation and cash rate, then pick a market model to run Monte Carlo paths and visualize risk bands.
             </div>
         </div>
     </div>
@@ -52,11 +64,20 @@ run_sim = st.sidebar.button("🚀 Run Simulation", type="primary")
 
 # 2. Market Model Settings
 with st.sidebar.expander("📊 Market Model", expanded=True):
-    model_options = ["Random Walk", "Mean Reversion (AR-1)", "Mean Reversion (AR-2)", "Mean Reversion (AR-3)", "Mean Reversion (AR-4)", "Mean Reversion (AR-5)", "Block Bootstrap"]
+    model_options = [
+        "Random Walk",
+        "Mean Reversion (AR-1)",
+        "Mean Reversion (AR-2)",
+        "Mean Reversion (AR-3)",
+        "Mean Reversion (AR-4)",
+        "Mean Reversion (AR-5)",
+        "Block Bootstrap",
+        "Stock/Bond Block Bootstrap",
+    ]
     selected_model = st.selectbox(
         "Market Model",
         options=model_options,
-        index=model_options.index("Block Bootstrap"), # Default to Block Bootstrap
+        index=model_options.index("Stock/Bond Block Bootstrap"), # Default to paired stock/bond model
         help="""
 Select the statistical model for simulating market returns:
 
@@ -65,18 +86,20 @@ Select the statistical model for simulating market returns:
 2. **Mean Reversion (AR-n) (Pessimistic/Conservative):** Assumes that periods of high returns are followed by lower returns (and vice versa) to return to a long-term mean. This is generally more conservative when starting from high market valuations, as it predicts a "cooling off" period.
 
 3. **Block Bootstrap (Balanced/Realistic):** Resamples actual historical blocks of data (e.g., 5-year chunks). This preserves real-world market shocks (volatility clustering) and "fat tails" (crashes like 2000 or 2008) exactly as they happened, offering a realistic "what if history repeats" scenario.
+
+4. **Stock/Bond Block Bootstrap:** Resamples paired stock and 10-year Treasury bond returns from the same historical years. Use this to test stock/bond allocations without breaking the historical relationship between stocks and bonds.
 """
     )
     
     block_size = 5 # Default value
-    if selected_model == "Block Bootstrap":
+    if selected_model in ["Block Bootstrap", "Stock/Bond Block Bootstrap"]:
         block_size = st.slider("Block Size (Years)", 1, 10, 5, help="Length of historical blocks to resample. Preserves historical correlations.")
         
     history_years = st.slider(
         "Historical Data (Years)",
         min_value=20,
         max_value=100,
-        value=50,
+        value=75,
         help="Look-back window for calibration. Affects all models."
     )
 
@@ -89,7 +112,7 @@ with st.sidebar.expander("💰 Portfolio & Strategy", expanded=True):
             "Aggressive (Buy the Dip)", 
             "Fully Invested (No Cash Buffer)"
         ],
-        index=0,
+        index=2,
         help="""
 **Conservative:** Uses cash buffer to fund withdrawals during market downturns (Panic/Drawdown) to avoid selling equity at a loss. Replenishes cash only when market recovers (High Water Mark).
 
@@ -116,14 +139,37 @@ with st.sidebar.expander("💰 Portfolio & Strategy", expanded=True):
         format="%d"
     )
 
-    annual_spend = st.number_input(
-        "Annual Spending ($)",
-        min_value=10_000,
-        max_value=1_000_000,
-        value=80_000,
-        step=10_000,
-        format="%d"
+    spending_cap_pct = st.slider(
+        "Spending Cap (% of Portfolio)",
+        min_value=1.0,
+        max_value=10.0,
+        value=5.0,
+        step=0.5,
+        help="Maximum annual withdrawal as a percentage of current portfolio value. The starting target is derived from this cap and initial net worth."
+    ) / 100
+
+    annual_spend, minimum_annual_spend = derive_spending_targets(
+        initial_net_worth=initial_net_worth,
+        spending_cap_pct=spending_cap_pct,
     )
+
+    st.info(
+        f"Derived target spending: \\${annual_spend:,.0f} real/year. "
+        f"Minimum floor: \\${minimum_annual_spend:,.0f} real/year."
+    )
+
+    st.caption("5% spending cap reference with a half-cap floor")
+    reference_rows = build_spending_reference_table()
+    reference_headers = list(reference_rows[0].keys())
+    reference_table = [
+        "| " + " | ".join(reference_headers) + " |",
+        "| " + " | ".join(["---"] * len(reference_headers)) + " |",
+    ]
+    reference_table.extend(
+        "| " + " | ".join(row[header] for header in reference_headers) + " |"
+        for row in reference_rows
+    )
+    st.markdown("\n".join(reference_table))
 
     # Conditional Inputs (Reactive)
     if selected_strategy != "No Cash Buffer":
@@ -147,14 +193,17 @@ with st.sidebar.expander("💰 Portfolio & Strategy", expanded=True):
         buffer_years = 0
         cash_interest_rate = 0.0
 
-    spending_cap_pct = st.slider(
-        "Spending Cap (% of Portfolio)",
-        min_value=1.0,
-        max_value=10.0,
-        value=4.0,
-        step=0.5,
-        help="Maximum annual withdrawal as percentage of total portfolio value"
-    ) / 100
+    if selected_model == "Stock/Bond Block Bootstrap":
+        bond_allocation_pct = st.slider(
+            "Bond Allocation (% of Non-Cash Portfolio)",
+            min_value=0,
+            max_value=80,
+            value=0,
+            step=5,
+            help="Percent of the non-cash portfolio held in 10-year Treasury bond total returns."
+        ) / 100
+    else:
+        bond_allocation_pct = 0.0
 
 # 4. Simulation Settings
 with st.sidebar.expander("🎲 Simulation Parameters", expanded=True):
@@ -202,27 +251,47 @@ def fetch_market_data(history_years: int):
     return get_sp500_residuals(history_years)
 
 
+@st.cache_data(ttl=3600)
+def fetch_stock_bond_data(history_years: int):
+    """Fetch and cache paired stock/bond returns."""
+    return get_stock_bond_data(history_years)
+
+
 if run_sim or 'results' not in st.session_state:
     with st.spinner("Fetching market data..."):
         try:
-            # Fetch data once for all models
-            mu, residuals, history = fetch_market_data(history_years)
-            
-            if history is None: # Check if market data fetching failed
-                st.error("Failed to fetch market data. Please check your internet connection or try again.")
-                st.stop()
-
             # Instantiate Market Model based on selection
             market_model = None
             model_info_msg = "" # For sidebar info display
 
             if selected_model == "Random Walk":
+                mu, residuals, history = fetch_market_data(history_years)
+                if history is None:
+                    st.error("Failed to load S&P 500 market data.")
+                    st.stop()
                 market_model = RandomWalkMarket(mu, residuals)
                 model_info_msg = f"Random Walk (Mean: {mu:.1%}, Std Dev of Residuals: {np.std(residuals):.1%})"
                 
             elif selected_model == "Block Bootstrap":
+                mu, residuals, history = fetch_market_data(history_years)
+                if history is None:
+                    st.error("Failed to load S&P 500 market data.")
+                    st.stop()
                 market_model = BlockBootstrapMarket(history, block_size=block_size)
                 model_info_msg = f"Block Bootstrap (Block Size: {block_size}y, History: {len(history)}y)"
+
+            elif selected_model == "Stock/Bond Block Bootstrap":
+                asset_history = fetch_stock_bond_data(history_years)
+                market_model = PairedBlockBootstrapMarket(
+                    stock_returns=asset_history["stock_returns"],
+                    bond_returns=asset_history["bond_returns"],
+                    block_size=block_size,
+                )
+                model_info_msg = (
+                    f"Stock/Bond Bootstrap (Bond Allocation: {bond_allocation_pct:.0%}, "
+                    f"Block Size: {block_size}y, History: {len(asset_history['years'])}y, "
+                    f"Years: {asset_history['years'][0]}-{asset_history['years'][-1]})"
+                )
                 
             elif "Mean Reversion (AR-" in selected_model:
                 ar_p = int(selected_model.split("AR-")[1][:-1]) # Extract AR order from string
@@ -235,11 +304,13 @@ if run_sim or 'results' not in st.session_state:
                                         f"Mean: {stats['mean_return']:.1%})")
                 else:
                     st.error("AR model calibration failed. Falling back to Random Walk.")
+                    mu, residuals, history = fetch_market_data(history_years)
                     market_model = RandomWalkMarket(mu, residuals)
                     model_info_msg = "Random Walk (AR model calibration failed)"
                     
             if market_model is None: # Fallback if model selection logic somehow fails
                 st.error("Failed to initialize market model. Defaulting to Random Walk.")
+                mu, residuals, history = fetch_market_data(history_years)
                 market_model = RandomWalkMarket(mu, residuals)
                 model_info_msg = "Random Walk (Default fallback)"
 
@@ -275,13 +346,16 @@ if run_sim or 'results' not in st.session_state:
             market_model=market_model, # Pass the instantiated model object
             spending_cap_pct=spending_cap_pct,
             cash_interest_rate=cash_interest_rate,
-            strategy=strategy_obj
+            strategy=strategy_obj,
+            minimum_annual_spend=minimum_annual_spend,
+            bond_allocation_pct=bond_allocation_pct
         )
         # Use REAL (Inflation-Adjusted) values for all visualizations
         portfolio_vals = sim_results['portfolio_values']
         withdrawal_vals = sim_results['withdrawal_values']
         cash_vals = sim_results['cash_values']
         equity_vals = sim_results['equity_values']
+        bond_vals = sim_results['bond_values']
     
     stats = calculate_statistics(portfolio_vals, withdrawal_vals, confidence)
     st.session_state['results'] = {
@@ -289,17 +363,20 @@ if run_sim or 'results' not in st.session_state:
         'withdrawal_vals': withdrawal_vals,
         'cash_vals': cash_vals,
         'equity_vals': equity_vals,
+        'bond_vals': bond_vals,
         'stats': stats,
         'params': {
             'years': years,
             'initial_net_worth': initial_net_worth,
             'annual_spend': annual_spend,
+            'minimum_annual_spend': minimum_annual_spend,
             'confidence': confidence,
             'history_years': history_years,
             'cash_interest_rate': cash_interest_rate,
             'panic_threshold': panic_threshold, 
             'buffer_years': buffer_years,
             'inflation_rate': inflation_rate,
+            'bond_allocation_pct': bond_allocation_pct,
             'strategy': selected_strategy # Store string name for display logic
         }
     }
@@ -309,12 +386,14 @@ if 'results' in st.session_state:
     results = st.session_state['results']
     stats = results['stats']
     params = results['params']
+    minimum_annual_spend_param = params.get('minimum_annual_spend', 0)
+    bond_allocation_pct_param = params.get('bond_allocation_pct', 0.0)
     years_range = list(range(params['years'] + 1))
     years_withdraw = list(range(1, params['years'] + 1))
     
     # Summary Statistics (Moved to Top)
     st.subheader("📋 Summary")
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     
     final_median = stats['portfolio']['median'][-1]
     final_lower = stats['portfolio']['lower'][-1]
@@ -346,9 +425,23 @@ if 'results' in st.session_state:
     with col4:
         withdrawal_shortfall = np.mean(results['withdrawal_vals'] < params['annual_spend']) * 100
         st.metric(
-            "Withdrawal Shortfall Risk", 
+            "Target Shortfall Risk",
             f"{withdrawal_shortfall:.1f}%",
             help="Probability of having to reduce spending below your target."
+        )
+
+    with col5:
+        if minimum_annual_spend_param > 0:
+            floor_breach = np.mean(results['withdrawal_vals'] < minimum_annual_spend_param) * 100
+            floor_help = "Probability of having to reduce spending below your minimum floor."
+        else:
+            floor_breach = 0.0
+            floor_help = "Set a minimum spending floor to track floor breach risk."
+
+        st.metric(
+            "Floor Breach Risk",
+            f"{floor_breach:.1f}%",
+            help=floor_help
         )
     
     # Portfolio Value Chart
@@ -425,9 +518,18 @@ if 'results' in st.session_state:
         y=params['annual_spend'],
         line_dash="solid",
         line_color="green",
-        annotation_text=f"Target: ${params['annual_spend']:,}",
+        annotation_text=f"Target: ${params['annual_spend']:,.0f}",
         annotation_position="top right"
     )
+
+    if minimum_annual_spend_param > 0:
+        fig2.add_hline(
+            y=minimum_annual_spend_param,
+            line_dash="dash",
+            line_color="orange",
+            annotation_text=f"Floor: ${minimum_annual_spend_param:,.0f}",
+            annotation_position="bottom right"
+        )
     
     # Lifestyle gap shading (where lower < target): fill area between target and lower percentile
     lower_vals = np.array(stats['withdrawal']['lower'])
@@ -499,6 +601,11 @@ if 'results' in st.session_state:
     # Dynamic Description based on Strategy
     strat_desc = ""
     active_strat = params.get('strategy', 'Conservative') # Default to conservative if missing
+    bond_desc = ""
+    if bond_allocation_pct_param > 0:
+        bond_desc = f"""
+**Bond Sleeve:** {bond_allocation_pct_param:.0%} of the non-cash portfolio is held in 10-year Treasury bond total returns and rebalanced annually. In drawdown/panic years, withdrawals use cash first, then bonds, then equity.
+"""
     
     if active_strat == "Conservative":
         strat_desc = f"""
@@ -526,6 +633,7 @@ if 'results' in st.session_state:
 This chart shows the composition of your portfolio for a specific "risk scenario" path, selected as the closest trajectory to the {ordinal(risk_percentile_val)} percentile outcome from the Portfolio Projection.
 
 {strat_desc}
+{bond_desc}
 
 **Cash Growth:** Cash in the buffer grows at the nominal interest rate of {cash_interest_rate:.1%} (equivalent to {real_cash_return_for_display:.1%} real return given {inflation_rate:.1%} inflation).
 """)
@@ -543,8 +651,9 @@ This chart shows the composition of your portfolio for a specific "risk scenario
     # 3. Find the index of the path with the minimum distance
     risk_path_idx = np.argmin(distances)
     
-    # Extract cash and equity for this representative risk path
+    # Extract cash, bonds, and equity for this representative risk path
     risk_cash = results['cash_vals'][:, risk_path_idx]
+    risk_bonds = results.get('bond_vals', np.zeros_like(results['cash_vals']))[:, risk_path_idx]
     risk_equity = results['equity_vals'][:, risk_path_idx]
     
     fig3 = go.Figure()
@@ -557,6 +666,16 @@ This chart shows the composition of your portfolio for a specific "risk scenario
         stackgroup='one',
         name='Cash Buffer'
     ))
+
+    if bond_allocation_pct_param > 0:
+        fig3.add_trace(go.Scatter(
+            x=years_range,
+            y=risk_bonds,
+            mode='lines',
+            line=dict(width=0.5, color='rgb(245, 158, 11)'),
+            stackgroup='one',
+            name='Bonds (10Y Treasury)'
+        ))
     
     fig3.add_trace(go.Scatter(
         x=years_range,

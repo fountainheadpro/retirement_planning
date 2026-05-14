@@ -64,6 +64,45 @@ class BlockBootstrapMarket:
             
         return market_matrix
 
+class PairedBlockBootstrapMarket:
+    """
+    Models paired stock and bond returns by resampling matching historical blocks.
+    """
+    def __init__(self, stock_returns, bond_returns, block_size=5):
+        self.block_size = block_size
+        self.stock_history = np.asarray(stock_returns).ravel()
+        self.bond_history = np.asarray(bond_returns).ravel()
+
+        if len(self.stock_history) != len(self.bond_history):
+            raise ValueError("Stock and bond histories must have the same length")
+        if len(self.stock_history) < self.block_size:
+            raise ValueError(f"History length {len(self.stock_history)} is shorter than block size {self.block_size}")
+
+    def simulate_matrix(self, years, n_paths):
+        """
+        Generates paired stock and bond return matrices using block bootstrapping.
+        Returns: dict with arrays of shape (years, n_paths)
+        """
+        n_history = len(self.stock_history)
+        n_blocks = int(np.ceil(years / self.block_size))
+
+        stock_matrix = np.zeros((years, n_paths))
+        bond_matrix = np.zeros((years, n_paths))
+
+        for i in range(n_paths):
+            stock_path = []
+            bond_path = []
+            for _ in range(n_blocks):
+                start_idx = np.random.randint(0, n_history - self.block_size + 1)
+                end_idx = start_idx + self.block_size
+                stock_path.extend(self.stock_history[start_idx:end_idx])
+                bond_path.extend(self.bond_history[start_idx:end_idx])
+
+            stock_matrix[:, i] = stock_path[:years]
+            bond_matrix[:, i] = bond_path[:years]
+
+        return {"stock": stock_matrix, "bond": bond_matrix}
+
 class MeanRevertingMarket:
     """
     Models the market using an AR(p) process on Returns.
@@ -177,6 +216,27 @@ def get_sp500_data(history_years=60):
         st.error(f"Error loading S&P 500 data: {e}")
         return None
 
+@st.cache_data
+def get_stock_bond_data(history_years=75, bond_column="TreasuryBondReturn"):
+    """Load paired annual stock and bond returns from the local Damodaran dataset."""
+    df = pd.read_csv("historical_asset_returns.csv")
+    df = df.sort_values("Year")
+
+    if bond_column not in df.columns:
+        raise ValueError(f"Unknown bond return column: {bond_column}")
+
+    if len(df) > history_years:
+        df = df.tail(history_years)
+
+    return {
+        "years": df["Year"].to_numpy(dtype=int),
+        "stock_returns": df["StockReturn"].to_numpy(dtype=float),
+        "bond_returns": df[bond_column].to_numpy(dtype=float),
+        "tbill_returns": df["TBillReturn"].to_numpy(dtype=float),
+        "treasury_bond_returns": df["TreasuryBondReturn"].to_numpy(dtype=float),
+        "corporate_bond_returns": df["CorporateBondReturn"].to_numpy(dtype=float),
+    }
+
 def create_ar_model(history_years=50, ar_order=1):
     """
     Creates and calibrates an AR(p) model using statsmodels.
@@ -213,13 +273,60 @@ from strategies import CashStrategy, ConservativeStrategy, StrategyContext
 # 2. SIMULATION ENGINE
 # ==========================================
 
+def derive_spending_targets(
+    initial_net_worth: float,
+    spending_cap_pct: float,
+    floor_ratio: float = 0.5,
+) -> tuple[float, float]:
+    """Derive real target and floor spending from initial wealth and cap."""
+    target_spend = max(0.0, initial_net_worth * spending_cap_pct)
+    floor_ratio = min(max(floor_ratio, 0.0), 1.0)
+    return target_spend, target_spend * floor_ratio
+
+
+def build_spending_reference_table(
+    spending_cap_pct: float = 0.05,
+    portfolio_values: tuple[float, ...] = (
+        2_000_000,
+        3_000_000,
+        4_000_000,
+        5_000_000,
+        6_000_000,
+        10_000_000,
+    ),
+    floor_ratio: float = 0.5,
+) -> list[dict[str, str]]:
+    """Build display-ready target/floor rows for common portfolio sizes."""
+    target_label = f"Target ({spending_cap_pct:.0%})"
+    floor_label = f"Floor ({spending_cap_pct * floor_ratio:.1%})"
+    rows = []
+
+    for portfolio_value in portfolio_values:
+        target_spend, floor_spend = derive_spending_targets(
+            initial_net_worth=portfolio_value,
+            spending_cap_pct=spending_cap_pct,
+            floor_ratio=floor_ratio,
+        )
+        rows.append(
+            {
+                "Portfolio": f"${portfolio_value / 1_000_000:g}M",
+                target_label: f"${target_spend:,.0f}",
+                floor_label: f"${floor_spend:,.0f}",
+            }
+        )
+
+    return rows
+
+
 def run_simulation(
     initial_net_worth, annual_spend, buffer_years, years, 
     panic_threshold, inflation_rate, n_paths,
     market_model,
     spending_cap_pct=0.04,
     cash_interest_rate=None,
-    strategy: CashStrategy = None
+    strategy: CashStrategy = None,
+    minimum_annual_spend: float = 0.0,
+    bond_allocation_pct: float = 0.0
 ):
     # Default strategy
     if strategy is None:
@@ -232,6 +339,15 @@ def run_simulation(
     # Pre-calculate Market Scenarios (Matrix of shape: years x n_paths)
     # This separates market generation from portfolio logic
     market_returns_matrix = market_model.simulate_matrix(years, n_paths)
+    if isinstance(market_returns_matrix, dict):
+        stock_returns_matrix = market_returns_matrix["stock"]
+        bond_returns_matrix = market_returns_matrix["bond"]
+    else:
+        stock_returns_matrix = market_returns_matrix
+        bond_returns_matrix = np.zeros_like(stock_returns_matrix)
+
+    bond_allocation_pct = min(max(bond_allocation_pct, 0.0), 1.0)
+    has_bond_sleeve = bond_allocation_pct > 0.0
 
     # Initial Allocation
     # Note: Strategy-specific overrides (like No Buffer forcing 0) should be handled
@@ -240,16 +356,20 @@ def run_simulation(
         
     initial_cash_target = annual_spend * buffer_years
     initial_cash = min(initial_cash_target, initial_net_worth)
-    initial_equity = initial_net_worth - initial_cash
+    initial_investable = initial_net_worth - initial_cash
+    initial_bonds = initial_investable * bond_allocation_pct
+    initial_equity = initial_investable - initial_bonds
     
     # State Arrays (All in Real Dollars)
     portfolio_values = np.zeros((years + 1, n_paths))
     cash_values = np.zeros((years + 1, n_paths))
     equity_values = np.zeros((years + 1, n_paths))
+    bond_values = np.zeros((years + 1, n_paths))
     
     portfolio_values[0, :] = initial_net_worth
     cash_values[0, :] = initial_cash
     equity_values[0, :] = initial_equity
+    bond_values[0, :] = initial_bonds
     
     # Detailed tracking
     withdrawals = np.zeros((years, n_paths))
@@ -257,10 +377,12 @@ def run_simulation(
     panic_flags = np.zeros((years, n_paths), dtype=bool)
     withdrawals_from_cash = np.zeros((years, n_paths))
     withdrawals_from_equity = np.zeros((years, n_paths))
+    withdrawals_from_bonds = np.zeros((years, n_paths))
     replenishments = np.zeros((years, n_paths))
     
     # Reset Arrays
     current_equity = np.full(n_paths, float(initial_equity))
+    current_bonds = np.full(n_paths, float(initial_bonds))
     current_cash = np.full(n_paths, float(initial_cash))
     
     # Track Market High Water Mark
@@ -270,7 +392,8 @@ def run_simulation(
     for t in range(1, years + 1):
         # 1. Market Movement (Nominal)
         # Retrieve pre-calculated return for this year
-        market_return_nominal = market_returns_matrix[t-1, :]
+        market_return_nominal = stock_returns_matrix[t-1, :]
+        bond_return_nominal = bond_returns_matrix[t-1, :]
             
         # Store NOMINAL market return for analysis/display if needed, 
         # but use REAL return for portfolio growth
@@ -282,12 +405,14 @@ def run_simulation(
         
         # Convert to REAL Return: (1 + r_nom) / (1 + i) - 1
         real_market_return = (1 + market_return_nominal) / (1 + inflation_rate) - 1
+        real_bond_return = (1 + bond_return_nominal) / (1 + inflation_rate) - 1
         
         # Real Cash Return
         real_cash_return = (1.0 + cash_interest_rate) / (1.0 + inflation_rate) - 1.0
 
         # 2. Update Asset Values (Real Terms)
         current_equity = np.maximum(0.0, current_equity * (1 + real_market_return))
+        current_bonds = np.maximum(0.0, current_bonds * (1 + real_bond_return))
         current_cash = np.maximum(0.0, current_cash * (1 + real_cash_return))
         
         # 3. Strategy Execution
@@ -298,9 +423,115 @@ def run_simulation(
         
         # Annual Spend (Real)
         target_spend_real = annual_spend
-        total_liquid_assets = current_equity + current_cash 
-        desired_withdrawal = np.minimum(target_spend_real, total_liquid_assets * spending_cap_pct)
+        total_liquid_assets = current_equity + current_bonds + current_cash
+        spending_cap_amount = total_liquid_assets * spending_cap_pct
+        capped_target_spend = np.minimum(target_spend_real, spending_cap_amount)
+        minimum_spend_real = min(max(minimum_annual_spend, 0.0), target_spend_real)
+        desired_withdrawal = np.minimum(
+            np.maximum(capped_target_spend, minimum_spend_real),
+            total_liquid_assets,
+        )
         target_cash_level = target_spend_real * buffer_years
+
+        if has_bond_sleeve:
+            remaining_withdrawal = desired_withdrawal.copy()
+            from_cash = np.zeros(n_paths)
+            from_bonds = np.zeros(n_paths)
+            from_equity = np.zeros(n_paths)
+
+            panic_with_cash = panic_mask & (current_cash > 0)
+            if np.any(panic_with_cash):
+                from_cash[panic_with_cash] = np.minimum(
+                    remaining_withdrawal[panic_with_cash],
+                    current_cash[panic_with_cash],
+                )
+                remaining_withdrawal -= from_cash
+
+            panic_with_bonds = panic_mask & (remaining_withdrawal > 0)
+            if np.any(panic_with_bonds):
+                from_bonds[panic_with_bonds] = np.minimum(
+                    remaining_withdrawal[panic_with_bonds],
+                    current_bonds[panic_with_bonds],
+                )
+                remaining_withdrawal -= from_bonds
+
+            use_equity = remaining_withdrawal > 0
+            if np.any(use_equity):
+                from_equity[use_equity] = np.minimum(
+                    remaining_withdrawal[use_equity],
+                    current_equity[use_equity],
+                )
+                remaining_withdrawal -= from_equity
+
+            use_bonds_normal = (~panic_mask) & (remaining_withdrawal > 0)
+            if np.any(use_bonds_normal):
+                bond_withdrawal = np.minimum(
+                    remaining_withdrawal[use_bonds_normal],
+                    current_bonds[use_bonds_normal],
+                )
+                from_bonds[use_bonds_normal] += bond_withdrawal
+                remaining_withdrawal[use_bonds_normal] -= bond_withdrawal
+
+            use_cash_normal = (~panic_mask) & (remaining_withdrawal > 0)
+            if np.any(use_cash_normal):
+                from_cash[use_cash_normal] += np.minimum(
+                    remaining_withdrawal[use_cash_normal],
+                    current_cash[use_cash_normal],
+                )
+
+            current_cash -= from_cash
+            current_bonds -= from_bonds
+            current_equity -= from_equity
+
+            at_peak = market_index >= (market_peak * 0.999)
+            replenish_mask = at_peak & (current_cash < target_cash_level)
+            if np.any(replenish_mask):
+                cash_shortfall = np.zeros(n_paths)
+                cash_shortfall[replenish_mask] = target_cash_level - current_cash[replenish_mask]
+
+                from_equity_replenish = np.minimum(cash_shortfall, current_equity)
+                current_cash += from_equity_replenish
+                current_equity -= from_equity_replenish
+                cash_shortfall -= from_equity_replenish
+
+                from_bonds_replenish = np.minimum(cash_shortfall, current_bonds)
+                current_cash += from_bonds_replenish
+                current_bonds -= from_bonds_replenish
+
+                replenishments[t-1, :] = from_equity_replenish + from_bonds_replenish
+
+            invested_assets = current_equity + current_bonds
+            target_bonds = invested_assets * bond_allocation_pct
+            bond_shortfall = target_bonds - current_bonds
+
+            buy_bonds_mask = bond_shortfall > 0
+            if np.any(buy_bonds_mask):
+                transfer = np.minimum(
+                    bond_shortfall[buy_bonds_mask],
+                    current_equity[buy_bonds_mask],
+                )
+                current_bonds[buy_bonds_mask] += transfer
+                current_equity[buy_bonds_mask] -= transfer
+
+            sell_bonds_mask = bond_shortfall < 0
+            if np.any(sell_bonds_mask):
+                transfer = np.minimum(
+                    -bond_shortfall[sell_bonds_mask],
+                    current_bonds[sell_bonds_mask],
+                )
+                current_bonds[sell_bonds_mask] -= transfer
+                current_equity[sell_bonds_mask] += transfer
+
+            withdrawals_from_cash[t-1, :] = from_cash
+            withdrawals_from_bonds[t-1, :] = from_bonds
+            withdrawals_from_equity[t-1, :] = from_equity
+            withdrawals[t-1, :] = from_cash + from_bonds + from_equity
+
+            portfolio_values[t, :] = current_equity + current_bonds + current_cash
+            cash_values[t, :] = current_cash
+            equity_values[t, :] = current_equity
+            bond_values[t, :] = current_bonds
+            continue
 
         # Create Context
         ctx = StrategyContext(
@@ -361,6 +592,7 @@ def run_simulation(
         current_equity -= from_equity
         
         withdrawals_from_cash[t-1, :] = from_cash
+        withdrawals_from_bonds[t-1, :] = 0.0
         withdrawals_from_equity[t-1, :] = from_equity
         withdrawals[t-1, :] = from_cash + from_equity
         
@@ -394,18 +626,21 @@ def run_simulation(
         replenishments[t-1, :] = realized_post_transfer
         
         # Store
-        portfolio_values[t, :] = current_equity + current_cash
+        portfolio_values[t, :] = current_equity + current_bonds + current_cash
         cash_values[t, :] = current_cash
         equity_values[t, :] = current_equity
+        bond_values[t, :] = current_bonds
             
     return {
         'portfolio_values': portfolio_values,
         'withdrawal_values': withdrawals,
         'cash_values': cash_values,
         'equity_values': equity_values,
+        'bond_values': bond_values,
         'market_returns': market_returns,
         'panic_flags': panic_flags,
         'withdrawals_from_cash': withdrawals_from_cash,
+        'withdrawals_from_bonds': withdrawals_from_bonds,
         'withdrawals_from_equity': withdrawals_from_equity,
         'replenishments': replenishments
     }
