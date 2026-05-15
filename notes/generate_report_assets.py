@@ -7,6 +7,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib import patches
 
 
 ROOT = Path(__file__).resolve().parent
@@ -93,6 +94,212 @@ def style_axis(ax: plt.Axes, grid_axis: str = "y") -> None:
     ax.tick_params(length=0)
     for side in ["left", "bottom"]:
         ax.spines[side].set_color("#c7cfd8")
+
+
+def add_box(
+    ax: plt.Axes,
+    xy: tuple[float, float],
+    width: float,
+    height: float,
+    title: str,
+    body: str,
+    facecolor: str,
+    edgecolor: str,
+) -> None:
+    box = patches.FancyBboxPatch(
+        xy,
+        width,
+        height,
+        boxstyle="round,pad=0.018,rounding_size=0.025",
+        transform=ax.transAxes,
+        facecolor=facecolor,
+        edgecolor=edgecolor,
+        linewidth=1.3,
+    )
+    ax.add_patch(box)
+    ax.text(
+        xy[0] + 0.025,
+        xy[1] + height - 0.055,
+        title,
+        transform=ax.transAxes,
+        ha="left",
+        va="top",
+        color=COLORS["ink"],
+        fontsize=11.5,
+        fontweight="bold",
+    )
+    ax.text(
+        xy[0] + 0.025,
+        xy[1] + height - 0.13,
+        body,
+        transform=ax.transAxes,
+        ha="left",
+        va="top",
+        color=COLORS["muted"],
+        fontsize=9.6,
+        linespacing=1.35,
+    )
+
+
+def add_arrow(ax: plt.Axes, start: tuple[float, float], end: tuple[float, float]) -> None:
+    ax.annotate(
+        "",
+        xy=end,
+        xytext=start,
+        xycoords="axes fraction",
+        arrowprops={
+            "arrowstyle": "->",
+            "color": COLORS["muted"],
+            "linewidth": 1.5,
+            "shrinkA": 5,
+            "shrinkB": 5,
+        },
+    )
+
+
+def plot_bootstrap_method(results: dict) -> None:
+    settings = results["settings"]
+    start_year = settings["baseline_start_year"]
+    end_year = settings["baseline_end_year"]
+    block_size = settings["block_size_years"]
+    n_paths = settings["n_paths"]
+
+    fig, ax = plt.subplots(figsize=(11.4, 6.0))
+    ax.axis("off")
+    title_block(
+        fig,
+        "Monte Carlo Engine: Historical Block Bootstrap",
+        "The simulation is random, but each draw is an actual multi-year market regime instead of an independent normal-distribution year.",
+    )
+
+    add_box(
+        ax,
+        (0.035, 0.60),
+        0.25,
+        0.34,
+        f"1. Historical records\n{start_year}-{end_year}",
+        "Each calendar year keeps its\nstock return, bond return,\nT-bill return, and CPI inflation.",
+        "#eef4f7",
+        "#9ab0bf",
+    )
+    add_box(
+        ax,
+        (0.375, 0.60),
+        0.25,
+        0.34,
+        f"2. Sample {block_size}-year blocks",
+        "A block keeps local sequence:\ncrash, recovery, inflation,\nand rates stay together.",
+        "#fff0d6",
+        "#d8a24b",
+    )
+    add_box(
+        ax,
+        (0.715, 0.60),
+        0.25,
+        0.34,
+        "3. Chain to 30 years",
+        f"Random blocks are appended\nuntil one retirement path is built.\nRepeat {n_paths:,} times.",
+        "#e7f1ee",
+        "#7aa892",
+    )
+    add_arrow(ax, (0.29, 0.77), (0.37, 0.77))
+    add_arrow(ax, (0.63, 0.77), (0.71, 0.77))
+
+    year_rows = [
+        ("1973", "stocks", "bonds", "T-bills", "CPI"),
+        ("1974", "stocks", "bonds", "T-bills", "CPI"),
+        ("1975", "stocks", "bonds", "T-bills", "CPI"),
+        ("...", "...", "...", "..."),
+    ]
+    for idx, row in enumerate(year_rows):
+        y = 0.53 - idx * 0.045
+        ax.text(
+            0.055,
+            y,
+            "  ".join(row),
+            transform=ax.transAxes,
+            family="monospace",
+            fontsize=8.6,
+            color=COLORS["muted"],
+        )
+
+    block_labels = ["1973-1977", "2000-2004", "2021-2025"]
+    for idx, label in enumerate(block_labels):
+        x = 0.395 + idx * 0.075
+        chip = patches.FancyBboxPatch(
+            (x, 0.47),
+            0.065,
+            0.055,
+            boxstyle="round,pad=0.01,rounding_size=0.015",
+            transform=ax.transAxes,
+            facecolor="#f7dca8",
+            edgecolor="#d8a24b",
+            linewidth=0.8,
+        )
+        ax.add_patch(chip)
+        ax.text(
+            x + 0.0325,
+            0.497,
+            label,
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=7.5,
+            color="#8d5a12",
+            fontweight="bold",
+        )
+
+    path_x = np.linspace(0.735, 0.945, 7)
+    path_y = [0.48, 0.53, 0.50, 0.57, 0.54, 0.61, 0.58]
+    ax.plot(path_x, path_y, transform=ax.transAxes, color=COLORS["floor"], linewidth=2.4)
+    ax.scatter(path_x, path_y, transform=ax.transAxes, s=18, color=COLORS["floor"], zorder=3)
+    ax.text(
+        0.84,
+        0.43,
+        "one simulated retirement path",
+        transform=ax.transAxes,
+        ha="center",
+        color=COLORS["muted"],
+        fontsize=9.2,
+    )
+
+    random_walk_panel = patches.FancyBboxPatch(
+        (0.035, 0.08),
+        0.93,
+        0.15,
+        boxstyle="round,pad=0.018,rounding_size=0.025",
+        transform=ax.transAxes,
+        facecolor="#f2f4f7",
+        edgecolor="#c7cfd8",
+        linewidth=1.1,
+    )
+    ax.add_patch(random_walk_panel)
+    ax.text(
+        0.06,
+        0.18,
+        "Why not classic random walk sampling?",
+        transform=ax.transAxes,
+        ha="left",
+        va="center",
+        color=COLORS["ink"],
+        fontsize=11,
+        fontweight="bold",
+    )
+    ax.text(
+        0.06,
+        0.12,
+        "Independent annual draws can match average return and volatility, but they break sequence risk and macro co-movement.\n"
+        "The block bootstrap keeps stocks, bonds, T-bills, and inflation tied to the same historical regime.",
+        transform=ax.transAxes,
+        ha="left",
+        va="center",
+        color=COLORS["muted"],
+        fontsize=9.4,
+        linespacing=1.35,
+    )
+
+    fig.subplots_adjust(top=0.82, left=0.04, right=0.98, bottom=0.06)
+    save(fig, "bond_report_bootstrap_method.png")
 
 
 def plot_spending_rule(results: dict) -> None:
@@ -437,6 +644,7 @@ def plot_objective_tradeoff(results: dict) -> None:
 def main() -> None:
     setup_style()
     results = load_results()
+    plot_bootstrap_method(results)
     plot_spending_rule(results)
     plot_safe_withdrawal_search(results)
     plot_cash_buffer(results)

@@ -105,7 +105,7 @@ For charts with two panels, the top panel shows spending reliability and failure
 
 ## Block Bootstrap Method
 
-The simulations use historical block bootstrap rather than a normal distribution or a simple average-return assumption.
+The engine is a **historical block-bootstrap Monte Carlo**. It still generates 20,000 random 30-year retirement paths, but the random draw is a real contiguous 5-year historical block, not an independently sampled normal-distribution return.
 
 The method works like this:
 
@@ -115,7 +115,11 @@ The method works like this:
 4. Repeat until the path reaches the 30-year retirement horizon.
 5. Run that process 20,000 times.
 
+![Historical block bootstrap method](/Users/sergeyzelvenskiy/retirement_planning/notes/assets/bond_report_bootstrap_method.png)
+
 The reason for using blocks is that market returns and inflation are not independent year to year. Real markets have clusters: crashes, recoveries, inflationary periods, high-return stretches, and sideways periods. Sampling 5-year blocks preserves some of that sequence structure.
+
+A classic random-walk Monte Carlo can match average return and volatility, but it tends to break sequence risk by making each year independent. The block-bootstrap method is better aligned with this question because retirement risk is driven by the order of returns, inflation, and withdrawals, not only by the average return.
 
 For stock-only tests, the bootstrap samples Damodaran's annual S&P 500 total-return series, including dividends reinvested, joined by year to T-bill returns and CPI inflation. For stock/bond tests, the model uses **paired block bootstrap**: stocks, bonds, T-bills, and inflation are sampled from the same historical years in the same 5-year blocks. That matters because bonds, cash, and inflation should not be modeled as independent random streams. Their value depends on the same macro regime that produced the stock return.
 

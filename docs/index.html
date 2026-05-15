@@ -541,7 +541,14 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
           </figure>
 
           <h3>Model</h3>
-          <p>The simulations use 20,000 Monte Carlo paths, annual returns, historical CPI inflation, and historical block bootstrap. The main lookback window is 1951-2025 from Aswath Damodaran’s annual return dataset, using the S&amp;P 500 total-return series with dividends reinvested.</p>
+          <p>The engine is a historical block-bootstrap Monte Carlo. It still generates 20,000 random 30-year retirement paths, but the random draw is a real contiguous 5-year historical block, not an independently sampled normal-distribution return.</p>
+          <figure class="figure">
+            <img src="assets/bond_report_bootstrap_method.png" alt="Diagram comparing historical block bootstrap with classic random walk sampling.">
+            <figcaption>The model samples actual 5-year historical regimes and chains them into 30-year retirement paths.</figcaption>
+          </figure>
+          <p>For each simulated path, the model randomly selects 5-year blocks from the 1951-2025 history and appends them until the path reaches 30 years. Each sampled calendar year keeps its observed stock return, bond return, T-bill return, and CPI inflation rate. That preserves local sequences such as crashes followed by recoveries, inflation clusters, and stock/bond/inflation co-movement.</p>
+          <p>A classic random-walk Monte Carlo can match average return and volatility, but it tends to break sequence risk by making each year independent. The block-bootstrap method is better aligned with this question because retirement risk is driven by the order of returns, inflation, and withdrawals, not only by the average return.</p>
+          <p>The main lookback window is 1951-2025 from Aswath Damodaran’s annual return dataset, using the S&amp;P 500 total-return series with dividends reinvested.</p>
           <p>Inflation comes from <a href="https://fred.stlouisfed.org/series/CPIAUCNS">FRED CPI-U</a>, calculated December-to-December. Stock, bond, T-bill, and inflation records are joined by year and sampled from the same 5-year historical blocks. Cash buffers are modeled with the historical T-bill return from the sampled year.</p>
         </section>
 
