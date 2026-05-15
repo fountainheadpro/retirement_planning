@@ -1,4 +1,4 @@
-# A Retirement Plan That Breaks The 60/40 Story
+# When Flexible Spending Weakens The Case For 60/40
 
 *Date: May 14, 2026*
 
@@ -13,9 +13,9 @@ That budget naturally creates two retirement objectives:
 - **Target spending:** the preferred lifestyle, including mandatory and discretionary spending.
 - **Floor spending:** the minimum acceptable lifestyle, focused on mandatory spending.
 
-This distinction matters because the traditional advice of a **60/40 portfolio and the 4% rule** treats "not running out of money" as the main objective. That is too narrow. A retiree can avoid ruin and still spend too many years below the lifestyle target.
+This distinction matters because the generic permanent **60/40 portfolio plus 4% rule** treats "not running out of money" as the main objective. That is too narrow. A retiree can avoid ruin and still spend too many years below the lifestyle target.
 
-This report stress-tests the traditional 60/40 plus 4% framing against a target-and-floor spending model. The finding is direct: under this flexible spending objective, the generic 60/40 answer solves the easy metric, literal ruin, while weakening the harder objective, maintaining the target lifestyle.
+This report stress-tests the generic permanent 60/40 allocation against a target-and-floor spending model. The finding is direct: under this flexible spending objective, the generic 60/40 answer solves the easy metric, literal ruin, while weakening the harder objective, maintaining the target lifestyle.
 
 The setup is now expressed as a percentage rule, not as one hardcoded starting portfolio:
 
@@ -30,6 +30,7 @@ The setup is now expressed as a percentage rule, not as one hardcoded starting p
 - Return source: **Damodaran annual S&P 500 total returns with dividends reinvested, T-bill returns, and bond total returns**.
 - Inflation source: **FRED CPIAUCNS**, calculated December-to-December.
 - Main lookback window: **75 years**, excluding the Great Depression while retaining major modern drawdowns.
+- Ending wealth: **real CPI-adjusted wealth**, shown in starting-year purchasing power.
 
 The percentage rule maps to these concrete examples:
 
@@ -42,20 +43,21 @@ The percentage rule maps to these concrete examples:
 | $6M | $300,000 | $150,000 |
 | $10M | $500,000 | $250,000 |
 
-Because the model has no taxes, fees, fixed-dollar expenses, or account limits, the simulation is scale-invariant. A result shown as `4.0x starting portfolio` means `$8M` ending wealth for a `$2M` starting portfolio, `$24M` for a `$6M` starting portfolio, and `$40M` for a `$10M` starting portfolio.
+Because the model has no taxes, fees, fixed-dollar expenses, or account limits, the simulation is scale-invariant. A result shown as `4.0x starting portfolio` means `$8M` of real ending wealth for a `$2M` starting portfolio, `$24M` for a `$6M` starting portfolio, and `$40M` for a `$10M` starting portfolio.
 
 The main result: under this flexible spending rule, large permanent cash and bond allocations did not improve the chosen objective. They mostly traded a reduction in ruin and floor-breach risk for more target shortfall and lower median ending wealth. A 60% bond portfolio had low ruin in this run, but target shortfall rose to 51.71% of simulated path-years and median ending wealth fell below the starting portfolio.
 
 The direct traditional benchmark makes the problem clearer:
 
-| Benchmark | Target / floor | Bonds | Ruin | Target shortfall | Final median |
-|---|---:|---:|---:|---:|---:|
-| 4% stock-only | 4% / 2% | 0% | 0.23% | 19.40% | 4.27x |
-| Traditional 4% 60/40 | 4% / 2% | 40% | 0.01% | 26.01% | 2.06x |
-| 5% stock-only flexible baseline | 5% / 2.5% | 0% | 1.21% | 24.73% | 3.32x |
-| 5% 60/40 | 5% / 2.5% | 40% | 0.31% | 36.13% | 1.41x |
+| Benchmark | Spending rule | Bonds | Ruin | Shortfall path-years | Real final median |
+|---|---|---:|---:|---:|---:|
+| 4% stock-only | 4% target / 2% floor, flexible | 0% | 0.23% (46 paths) | 19.40% | 4.27x |
+| 4% 60/40 | 4% target / 2% floor, flexible | 40% | 0.01% (1 path) | 26.01% | 2.06x |
+| Classic fixed-real 4% 60/40 | Fixed 4%, no spending flexibility | 40% | 4.69% (938 paths) | 0.82% | 1.96x |
+| 5% stock-only baseline | 5% target / 2.5% floor, flexible | 0% | 1.21% (242 paths) | 24.73% | 3.32x |
+| 5% 60/40 | 5% target / 2.5% floor, flexible | 40% | 0.31% (62 paths) | 36.13% | 1.41x |
 
-The classic 4% 60/40 plan looks safe if the only question is ruin. But it has more target-shortfall years and less than half the median ending wealth of the 4% stock-only plan. It also delivers a lower target lifestyle than the 5% stock-only baseline while ending with much less wealth.
+The flexible 4% target / 2% floor 60/40 plan looks safe if the only question is ruin. But it has more target-shortfall years and less than half the real median ending wealth of the 4% stock-only flexible plan. The true fixed-real 4% 60/40 benchmark behaves differently: it does not show many shortfall years because it refuses to cut spending until assets are depleted, which raises ruin to 4.69%.
 
 The safe-withdrawal sweep gives useful context for the 5% baseline. With zero cash and zero bonds, a 4% target is robust. A 5% target still keeps floor breach low, but historical inflation makes it less forgiving than the fixed-inflation version. At 6%, measurable failure risk starts to appear. From 7% upward, the target becomes increasingly aggressive, and by 9-10% the plan is no longer close to safe under this model.
 
@@ -65,9 +67,10 @@ The tables report two decimal places for reproducibility, not because the second
 
 The simulator separates three outcomes that are easy to blur together:
 
-- **Ruin:** the portfolio runs out of money.
-- **Target shortfall:** a simulated year has withdrawals below the target.
-- **Floor breach:** a simulated year has withdrawals below the minimum floor.
+- **Ruin:** percent of simulated paths that hit zero before year 30.
+- **Target shortfall:** percent of all simulated path-years in which withdrawal is below the real target.
+- **Floor breach:** percent of all simulated path-years in which the portfolio cannot fund the real floor.
+- **Final p10 / median:** real ending wealth in starting-year purchasing power, divided by starting wealth.
 
 That distinction is central. Ruin is catastrophic. Floor breach means the plan cannot support even the reduced lifestyle. Target shortfall is softer: the household is still spending above the floor, but below the preferred lifestyle target.
 
@@ -91,7 +94,7 @@ The main table metric called **target shortfall** is the percentage of all simul
 
 ![Spending rule: 5% target and 2.5% floor](/Users/sergeyzelvenskiy/retirement_planning/notes/assets/bond_report_spending_cap.png)
 
-The spending-rule chart separates four lived regimes: floor breach, mandatory spending only, discretionary cuts, and full target lifestyle.
+The spending-rule chart separates four lived regimes: floor breach, mandatory spending only, discretionary cuts, and full target lifestyle. The left threshold, `0.025x`, means one year of floor spending remains. For a `$6M` starting portfolio, that is `$150,000`.
 
 The report figures use the same visual language throughout:
 
@@ -105,21 +108,31 @@ For charts with two panels, the top panel shows spending reliability and failure
 
 ## Block Bootstrap Method
 
-The engine is a **historical block-bootstrap Monte Carlo**. It still generates 20,000 random 30-year retirement paths, but the random draw is a real contiguous 5-year historical block, not an independently sampled normal-distribution return.
+The engine is a **historical block-bootstrap Monte Carlo**. It still generates 20,000 random 30-year retirement paths, but the random draw is an actual contiguous 5-year historical block, not an independently sampled normal-distribution return.
 
 The method works like this:
 
 1. Start with actual annual historical return and inflation records.
-2. Randomly select a contiguous 5-year block from history.
+2. Randomly select a contiguous 5-year block from history, with replacement.
 3. Append that block to a simulated path.
-4. Repeat until the path reaches the 30-year retirement horizon.
+4. Repeat until the path reaches the 30-year retirement horizon, which is six 5-year blocks.
 5. Run that process 20,000 times.
 
 ![Historical block bootstrap method](/Users/sergeyzelvenskiy/retirement_planning/notes/assets/bond_report_bootstrap_method.png)
 
 The reason for using blocks is that market returns and inflation are not independent year to year. Real markets have clusters: crashes, recoveries, inflationary periods, high-return stretches, and sideways periods. Sampling 5-year blocks preserves some of that sequence structure.
 
-A classic random-walk Monte Carlo can match average return and volatility, but it tends to break sequence risk by making each year independent. The block-bootstrap method is better aligned with this question because retirement risk is driven by the order of returns, inflation, and withdrawals, not only by the average return.
+Independent annual sampling can match average return and volatility, but it tends to break sequence risk and macro co-movement by making each year independent. The block-bootstrap method is better aligned with this question because retirement risk is driven by the order of returns, inflation, and withdrawals, not only by the average return.
+
+Each simulated year follows this chronology:
+
+1. Sample the next historical year from the current 5-year block.
+2. Apply sampled stock, bond, and T-bill returns, then deflate by that year's CPI inflation.
+3. Compute the spending cap from the post-return real portfolio value.
+4. Withdraw at year-end under the target/cap/floor rule.
+5. Replenish cash when the strategy calls for it, rebalance bonds annually, and record outcomes.
+
+Because the model deflates returns each year, all ending-wealth multiples in the tables and charts are real, CPI-adjusted multiples of the starting portfolio.
 
 For stock-only tests, the bootstrap samples Damodaran's annual S&P 500 total-return series, including dividends reinvested, joined by year to T-bill returns and CPI inflation. For stock/bond tests, the model uses **paired block bootstrap**: stocks, bonds, T-bills, and inflation are sampled from the same historical years in the same 5-year blocks. That matters because bonds, cash, and inflation should not be modeled as independent random streams. Their value depends on the same macro regime that produced the stock return.
 
@@ -141,7 +154,7 @@ This experiment varies the cash buffer from 0 to 5 years of target spending. A b
 
 The remaining portfolio is invested in the Damodaran S&P 500 total-return series, using the 75-year lookback window with aligned historical T-bill returns and inflation.
 
-| Cash buffer | Ruin | Target shortfall | Floor breach | Final p10 | Final median |
+| Cash buffer | Ruin | Target shortfall | Floor breach | Real final p10 | Real final median |
 |---:|---:|---:|---:|---:|---:|
 | 0 years | 1.21% | 24.73% | 0.20% | 0.60x | 3.32x |
 | 1 year | 1.09% | 25.25% | 0.17% | 0.59x | 3.13x |
@@ -149,9 +162,9 @@ The remaining portfolio is invested in the Damodaran S&P 500 total-return series
 | 3 years | 0.92% | 28.00% | 0.12% | 0.53x | 2.57x |
 | 5 years | 0.74% | 32.68% | 0.08% | 0.43x | 1.92x |
 
-![Cash buffer tradeoff](/Users/sergeyzelvenskiy/retirement_planning/notes/assets/bond_report_cash_buffer.png)
+![T-bill cash buffer tradeoff](/Users/sergeyzelvenskiy/retirement_planning/notes/assets/bond_report_cash_buffer.png)
 
-The top panel shows the key problem: cash reduces the already-small floor risk only slightly, while target shortfall rises steadily. The bottom panel shows the cost in lower ending wealth.
+The plot separates target shortfall from tiny ruin/floor probabilities so both sides of the tradeoff are visible. T-bill cash reduces the already-small floor risk only slightly, while target shortfall rises steadily and real ending wealth falls.
 
 **Conclusion:** T-bill cash still does what cash is supposed to do: it slightly lowers ruin and floor-breach risk. But it remains expensive. A 5-year buffer lowers ruin from 1.21% to 0.74%, while target shortfall rises from 24.73% to 32.68% and median ending wealth falls from 3.32x to 1.92x. That is why the rest of the report uses zero cash buffer as the baseline.
 
@@ -159,7 +172,7 @@ The top panel shows the key problem: cash reduces the already-small floor risk o
 
 This experiment keeps the same 5% target and 2.5% floor, with no cash buffer, and changes the S&P 500 total-return lookback window.
 
-| History window | Ruin | Target shortfall | Floor breach | Final p10 | Final median |
+| History window | Ruin | Target shortfall | Floor breach | Real final p10 | Real final median |
 |---:|---:|---:|---:|---:|---:|
 | 50 years (1976-2025) | 0.33% | 19.11% | 0.04% | 0.88x | 4.47x |
 | 75 years (1951-2025) | 1.21% | 24.73% | 0.20% | 0.60x | 3.32x |
@@ -169,13 +182,11 @@ This experiment keeps the same 5% target and 2.5% floor, with no cash buffer, an
 
 The Depression-inclusive 98-year case is useful as a stress test, but it changes the modeled world. It is not just a longer sample; it pulls in a different economic regime.
 
-The 98-year window is much harsher because it includes the Great Depression. That may be useful as a stress test, but it is a different modeling choice from a modern-retirement baseline.
-
-The Depression-inclusive window is useful as a stress test, but a Great Depression-level scenario is not only a portfolio problem. If the planning objective is to survive a broad economic and social breakdown, the plan has to expand beyond asset allocation into resilience planning: liquidity, location, food, health care access, family support, home security, and practical contingency plans. A retirement spreadsheet can model asset returns and inflation; it cannot model institutional failure or social instability.
+The 98-year window is a tail-regime stress test. It includes economic conditions that may not represent the central planning case, but it is useful for understanding sensitivity to rare historical sequences.
 
 The 75-year window keeps difficult nominal-return regimes: the 1970s, 2000-2002, 2008, 2022, and other modern drawdowns. It excludes the Depression-era return path because the goal here is to test a contemporary baseline, not the most severe possible historical regime.
 
-**Conclusion:** the 75-year window is the main baseline because it keeps modern severe sequences, including the 1970s inflation problem, while excluding the Great Depression. That exclusion is not a claim that a Depression-level collapse cannot happen. It is a scope boundary: preparing for that kind of breakdown goes beyond portfolio allocation into physical resilience, food storage, off-grid capacity, gold, cash outside the banking system, and personal security. That is a different plan from a retirement withdrawal model.
+**Conclusion:** the 75-year window remains the main baseline because it keeps modern severe sequences, including the 1970s inflation problem, while excluding the Great Depression and World War II regime from the central case. The 98-year result should still be read as a legitimate stress test, not dismissed.
 
 ## Experiment 3: Safe Withdrawal Search
 
@@ -187,7 +198,7 @@ After the cash-buffer experiment, the working assumption is zero cash buffer. Th
 - target spending equal to the listed cap,
 - minimum floor equal to 50% of that target.
 
-| Target cap | Floor | Ruin | Target shortfall | Floor breach | Final p10 | Final median |
+| Target spending rate | Floor | Ruin | Target shortfall | Floor breach | Real final p10 | Real final median |
 |---:|---:|---:|---:|---:|---:|---:|
 | 4% | 2.0% | 0.23% | 19.40% | 0.03% | 0.86x | 4.27x |
 | 5% | 2.5% | 1.21% | 24.73% | 0.20% | 0.60x | 3.32x |
@@ -199,7 +210,7 @@ After the cash-buffer experiment, the working assumption is zero cash buffer. Th
 
 ![Safe withdrawal search](/Users/sergeyzelvenskiy/retirement_planning/notes/assets/bond_report_safe_withdrawal_search.png)
 
-The shaded regions summarize the curve: 4-5% remains the durable range, 6-7% is aggressive, and 8-10% becomes fragile quickly.
+The shaded regions summarize the curve: 4-5% remains the durable range, 6-7% is aggressive, and 8-10% becomes fragile quickly. These zone labels are judgmental summaries based on rising ruin, floor breach, target shortfall, and declining real p10 wealth.
 
 The useful range is not a single magic number. The 4% target is conservative. The 5% target looks reasonable for a flexible-spending household with a 2.5% floor. The 6% target is more aggressive but not absurd. Above that, the risk profile changes quickly: target shortfall becomes common, floor breach becomes visible, and ending wealth erodes sharply.
 
@@ -207,17 +218,17 @@ This is why the bond experiment uses 5% as the main baseline. It is meaningfully
 
 The next table explains what "target shortfall" means in lived-path terms. The first column repeats the path-year metric. The second column is the probability that a path misses the target at least once.
 
-| Target cap | Shortfall path-years | Ever miss target | Median shortfall years if any | Avg shortfall-year spending | Avg target gap |
-|---:|---:|---:|---:|---:|---:|
-| 4% | 19.40% | 61.05% | 6 | 3.00% | 25.1% |
-| 5% | 24.73% | 64.46% | 9 | 3.63% | 27.5% |
-| 6% | 30.93% | 70.06% | 11 | 4.18% | 30.3% |
-| 7% | 37.91% | 73.24% | 16 | 4.64% | 33.6% |
-| 8% | 45.53% | 77.60% | 20 | 5.01% | 37.3% |
-| 9% | 53.37% | 81.99% | 23 | 5.28% | 41.4% |
-| 10% | 60.95% | 85.65% | 25 | 5.43% | 45.7% |
+| Target spending rate | Shortfall path-years | Ever miss target | Median shortfall years if any | Avg shortfall-year spending | Avg target gap | Integrated target loss |
+|---:|---:|---:|---:|---:|---:|---:|
+| 4% | 19.40% | 61.05% | 6 | 3.00% | 25.1% | 4.87% |
+| 5% | 24.73% | 64.46% | 9 | 3.63% | 27.5% | 6.80% |
+| 6% | 30.93% | 70.06% | 11 | 4.18% | 30.3% | 9.38% |
+| 7% | 37.91% | 73.24% | 16 | 4.64% | 33.6% | 12.76% |
+| 8% | 45.53% | 77.60% | 20 | 5.01% | 37.3% | 17.00% |
+| 9% | 53.37% | 81.99% | 23 | 5.28% | 41.4% | 22.08% |
+| 10% | 60.95% | 85.65% | 25 | 5.43% | 45.7% | 27.83% |
 
-For example, at the 5% target, 24.73% of all simulated path-years are below target. Across paths, 64.46% experience at least one target miss. Among those affected paths, the median path has 9 shortfall years, and the average shortfall-year withdrawal is 3.63% of the initial portfolio instead of 5%.
+For example, at the 5% target, 24.73% of all simulated path-years are below target. Across paths, 64.46% experience at least one target miss. Among those affected paths, the median path has 9 shortfall years, and the average shortfall-year withdrawal is 3.63% of the initial portfolio instead of 5%. The integrated target-loss metric combines frequency and severity; at 5%, the average loss is 6.80% of target-year spending across the full retirement horizon.
 
 **Conclusion:** the search turns the withdrawal rate into a quantifiable risk choice rather than a single magic number. Both 4% and 5% have low ruin risk in this model, but 4% makes that risk much lower: 0.23% ruin versus 1.21% at 5%. The tradeoff is lifestyle. A retiree can choose how much target shortfall, floor risk, and ending-wealth uncertainty they are willing to accept; above 6%, the plan starts depending too heavily on favorable sequences.
 
@@ -225,7 +236,7 @@ For example, at the 5% target, 24.73% of all simulated path-years are below targ
 
 This experiment keeps the 5% target, 2.5% floor, zero cash, zero bonds, and 75-year Damodaran S&P 500 total-return history. It changes only the bootstrap block size.
 
-| Block size | Ruin | Target shortfall | Floor breach | Final p10 | Final median |
+| Block size | Ruin | Target shortfall | Floor breach | Real final p10 | Real final median |
 |---:|---:|---:|---:|---:|---:|
 | 1 year | 1.47% | 23.46% | 0.32% | 0.62x | 3.82x |
 | 3 years | 1.16% | 22.89% | 0.23% | 0.65x | 3.46x |
@@ -238,23 +249,23 @@ This experiment keeps the 5% target, 2.5% floor, zero cash, zero bonds, and 75-y
 
 This experiment removes the cash buffer and varies the bond allocation from 0% to 60% of the non-cash portfolio. Bonds are modeled as 10-year Treasury total returns, paired with S&P 500 total returns from the same historical blocks.
 
-Two spending targets are shown. The 4% table tests the traditional withdrawal-rate baseline. The 5% table tests the higher flexible-spending target used elsewhere in the report.
+Two flexible spending targets are shown. The 4% table tests a target/floor version of the traditional withdrawal-rate baseline. The 5% table tests the higher flexible-spending target used elsewhere in the report. The true fixed-real 4% withdrawal benchmark is shown in the executive summary because it is a different rule, not another target/floor case.
 
 ### 4% Target / 2% Floor
 
-| Bond allocation | Ruin | Target shortfall | Floor breach | Final p10 | Final median |
+| Bond allocation | Ruin | Target shortfall | Floor breach | Real final p10 | Real final median |
 |---:|---:|---:|---:|---:|---:|
 | 0% bonds | 0.23% | 19.40% | 0.03% | 0.86x | 4.27x |
 | 10% bonds | 0.10% | 19.79% | 0.01% | 0.85x | 3.68x |
 | 20% bonds | 0.05% | 21.02% | 0.01% | 0.82x | 3.09x |
-| 40% bonds | 0.01% | 26.01% | 0.00% | 0.70x | 2.06x |
-| 60% bonds | 0.01% | 37.93% | 0.00% | 0.55x | 1.24x |
+| 40% bonds | 0.01% (1 path) | 26.01% | 0.00% (3 path-years) | 0.70x | 2.06x |
+| 60% bonds | 0.01% (1 path) | 37.93% | 0.00% (1 path-year) | 0.55x | 1.24x |
 
 ### 5% Target / 2.5% Floor
 
 Because this experiment uses the same Damodaran S&P 500 total-return series as the stock-only experiments, the 0% bond row matches the 5% zero-cash baseline above.
 
-| Bond allocation | Ruin | Target shortfall | Floor breach | Final p10 | Final median |
+| Bond allocation | Ruin | Target shortfall | Floor breach | Real final p10 | Real final median |
 |---:|---:|---:|---:|---:|---:|
 | 0% bonds | 1.21% | 24.73% | 0.20% | 0.60x | 3.32x |
 | 10% bonds | 0.78% | 25.98% | 0.11% | 0.59x | 2.80x |
@@ -264,7 +275,7 @@ Because this experiment uses the same Damodaran S&P 500 total-return series as t
 
 ![Bond allocation tradeoff](/Users/sergeyzelvenskiy/retirement_planning/notes/assets/bond_report_bond_allocation.png)
 
-The shaded high-bond region shows the central tradeoff. More bonds drive ruin and floor breach toward zero, but target shortfall rises and ending wealth falls.
+The plot separates target shortfall from tiny ruin/floor probabilities. More bonds drive ruin and floor breach toward zero, but target shortfall rises and real ending wealth falls.
 
 Bonds do what they are supposed to do in a narrow risk-control sense: they reduce volatility, ruin, and floor breach.
 
@@ -272,23 +283,25 @@ But the cost is material. Higher bond allocations reduce the growth engine that 
 
 The target-shortfall experience also changes. The 60% bond allocation does not just create slightly more misses; it makes target misses much more common across paths.
 
-| Bond allocation | Shortfall path-years | Ever miss target | Median shortfall years if any | Avg shortfall-year spending | Avg target gap |
-|---:|---:|---:|---:|---:|---:|
-| 0% bonds | 24.73% | 64.46% | 9 | 3.63% | 27.5% |
-| 10% bonds | 25.98% | 64.25% | 10 | 3.70% | 26.1% |
-| 20% bonds | 28.07% | 68.02% | 10 | 3.76% | 24.9% |
-| 40% bonds | 36.13% | 72.44% | 15 | 3.81% | 23.8% |
-| 60% bonds | 51.71% | 84.02% | 21 | 3.74% | 25.1% |
+| Bond allocation | Shortfall path-years | Ever miss target | Median shortfall years if any | Avg shortfall-year spending | Avg target gap | Integrated target loss |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0% bonds | 24.73% | 64.46% | 9 | 3.63% | 27.5% | 6.80% |
+| 10% bonds | 25.98% | 64.25% | 10 | 3.70% | 26.1% | 6.77% |
+| 20% bonds | 28.07% | 68.02% | 10 | 3.76% | 24.9% | 6.99% |
+| 40% bonds | 36.13% | 72.44% | 15 | 3.81% | 23.8% | 8.61% |
+| 60% bonds | 51.71% | 84.02% | 21 | 3.74% | 25.1% | 12.99% |
 
 This companion table is why the target-shortfall metric should not be read as a path failure rate. At 60% bonds, 51.71% is the share of simulated years below target; 84.02% is the share of paths that experience at least one target miss; and affected paths have a median of 21 target-shortfall years.
 
-![Objective tradeoff](/Users/sergeyzelvenskiy/retirement_planning/notes/assets/bond_report_objective_tradeoff.png)
+The severity story is more nuanced than the frequency story. The 40% bond row has more shortfall path-years than the 0% bond row, but a smaller average target gap in each shortfall year: 23.8% versus 27.5%. Bonds made shortfalls more frequent, not deeper in every comparison. The integrated target-loss metric combines the two effects, and it is still worse for 40% bonds: 8.61% of target-year spending versus 6.80% for stock-only.
 
-The objective chart isolates the bond decision: each step toward more bonds moves down and to the right, toward lower median ending wealth and higher target shortfall.
+![Objective tradeoff](/Users/sergeyzelvenskiy/retirement_planning/notes/assets/bond_report_objective_tradeoff_4_5.png)
+
+The objective chart isolates the bond decision for both the 4% and 5% targets: each step toward more bonds moves down and to the right, toward lower real median ending wealth and higher target shortfall.
 
 Ending wealth is not just inheritance or excess. It is longevity cushion. A 30-year simulation is a modeling horizon, not a known lifespan. If the retiree lives 35 or 40 years, the difference between ending with 3.32x and 1.41x is not cosmetic. It is the reserve that protects against extra years, late-life care, bad post-year-30 returns, family needs, and inflation surprises.
 
-**Conclusion:** bonds reduce ruin and floor-breach risk, but they do not improve the target/floor objective. At 4%, stock-only already has a 0.23% ruin rate; 60/40 cuts that to 0.01%, but target shortfall rises from 19.40% to 26.01% and median ending wealth falls from 4.27x to 2.06x. At 5%, the same tradeoff appears at a higher spending level: 60/40 cuts ruin from 1.21% to 0.31%, while target shortfall rises and median wealth falls sharply.
+**Conclusion:** bonds reduce ruin and floor-breach risk, but they do not improve the target/floor objective. At 4%, stock-only already has a 0.23% ruin rate; 60/40 cuts that to 0.01%, but target shortfall rises from 19.40% to 26.01% and real median ending wealth falls from 4.27x to 2.06x. At 5%, 60/40 cuts ruin from 1.21% to 0.31%, but shortfall becomes more frequent. The average gap in a shortfall year is smaller with 40% bonds, but the integrated target loss is still worse: 8.61% of target-year spending versus 6.80% for stock-only.
 
 ## Interpretation
 
@@ -386,9 +399,11 @@ Important limitations:
 - Taxes are ignored.
 - Fees are ignored.
 - Returns are annual, not monthly.
+- Withdrawals happen after annual returns; beginning-of-year or monthly withdrawals may be harsher.
 - Inflation is annual CPI-U, not monthly household-specific inflation.
 - Cash earns historical T-bill returns sampled from the same calendar years as stocks, bonds, and inflation.
 - Bonds are 10-year Treasury annual total returns, not a live bond fund.
+- Cash is replenished mechanically when the strategy is at a market peak; a different reserve policy could change results.
 - Spending behavior is mechanical.
 - The bootstrap assumes historical blocks are a reasonable proxy for future regimes.
 - The model does not include Social Security, pensions, mortgages, health shocks, or estate goals.
@@ -404,7 +419,11 @@ The most important follow-up tests are:
 - Social Security or pension income layered into the spending rule,
 - monthly returns and monthly withdrawal timing,
 - beginning-of-year versus end-of-year withdrawals,
+- 35- and 40-year longevity horizons,
+- 25%, 50%, and 75% floor-to-target ratios,
+- probability of 5+ and 10+ consecutive years below target,
 - dynamic bond glidepaths rather than fixed allocations,
+- Social Security or pension income layered into the floor,
 - valuation-aware equity assumptions,
 - and additional return datasets where available.
 
@@ -418,4 +437,4 @@ The primary objective is not to stay fully invested for its own sake. The object
 
 Under this flexible spending rule, the main risk is not literal ruin. The main risk is spending below the target lifestyle. Because the rule already cuts spending when wealth falls, large permanent cash and bond allocations mostly reduce an already-small catastrophic risk while increasing target shortfall and lowering long-term wealth.
 
-This does not prove that bonds are useless. It says that for a retiree who can flex from a 5% target to a 2.5% floor, broad equity exposure is hard to beat in this model unless bonds are being used for a specific liability, behavioral need, or guaranteed-income strategy.
+The report does not replace one abstract label with another. It replaces "conservative" and "aggressive" with measurable odds of ruin, measurable lifestyle shortfall, floor-breach risk, and real longevity cushion. Under this model, a generic permanent 60/40 allocation is not automatically safer. It is a different quality-of-life tradeoff with visible costs.

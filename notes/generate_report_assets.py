@@ -169,7 +169,7 @@ def plot_bootstrap_method(results: dict) -> None:
     title_block(
         fig,
         "Monte Carlo Engine: Historical Block Bootstrap",
-        "The simulation is random, but each draw is an actual multi-year market regime instead of an independent normal-distribution year.",
+        "The simulation is random, but each draw is an actual multi-year market regime sampled with replacement.",
     )
 
     add_box(
@@ -188,7 +188,7 @@ def plot_bootstrap_method(results: dict) -> None:
         0.25,
         0.34,
         f"2. Sample {block_size}-year blocks",
-        "A block keeps local sequence:\ncrash, recovery, inflation,\nand rates stay together.",
+        "Blocks are sampled with replacement.\nEach block keeps local sequence:\ncrash, recovery, inflation,\nand rates stay together.",
         "#fff0d6",
         "#d8a24b",
     )
@@ -197,8 +197,8 @@ def plot_bootstrap_method(results: dict) -> None:
         (0.715, 0.60),
         0.25,
         0.34,
-        "3. Chain to 30 years",
-        f"Random blocks are appended\nuntil one retirement path is built.\nRepeat {n_paths:,} times.",
+        "3. Chain six blocks",
+        f"30 years = six {block_size}-year blocks.\nAppend blocks to build one path.\nRepeat {n_paths:,} times.",
         "#e7f1ee",
         "#7aa892",
     )
@@ -277,7 +277,7 @@ def plot_bootstrap_method(results: dict) -> None:
     ax.text(
         0.06,
         0.18,
-        "Why not classic random walk sampling?",
+        "Why not independent annual sampling?",
         transform=ax.transAxes,
         ha="left",
         va="center",
@@ -317,7 +317,7 @@ def plot_spending_rule(results: dict) -> None:
     fig, ax = plt.subplots(figsize=(11.2, 6.2))
     title_block(
         fig,
-        "Spending Rule: Four Lifestyle Regimes",
+        "Spending Rule Example: 5% Target / 2.5% Floor",
         "The floor protects mandatory spending; the cap cuts discretionary spending before ruin.",
     )
 
@@ -337,6 +337,15 @@ def plot_spending_rule(results: dict) -> None:
         linewidth=3.4,
         solid_capstyle="round",
         zorder=4,
+    )
+    ax.plot(
+        x,
+        cap_spend * 100,
+        color=COLORS["muted"],
+        linewidth=1.4,
+        linestyle=(0, (2, 3)),
+        alpha=0.58,
+        zorder=2,
     )
 
     ax.axhline(target_pct * 100, color=COLORS["target"], linestyle=(0, (5, 3)), linewidth=1.7)
@@ -387,7 +396,7 @@ def plot_spending_rule(results: dict) -> None:
     )
 
     ax.annotate(
-        "floor breach\nbelow 0.025x",
+        "floor breach below\none floor-spending year",
         xy=(floor_threshold * 0.55, floor_threshold * 55),
         xytext=(0.13, 1.05),
         arrowprops=dict(arrowstyle="->", color=COLORS["ruin"], linewidth=1.1),
@@ -414,6 +423,14 @@ def plot_spending_rule(results: dict) -> None:
         fontsize=9.5,
         ha="left",
     )
+    ax.text(
+        0.72,
+        4.05,
+        "uncapped line:\n5% of current portfolio",
+        color=COLORS["muted"],
+        fontsize=8.8,
+        ha="center",
+    )
     ax.text(1.42, target_pct * 100 + 0.13, "target 5%", color=COLORS["target"], fontweight="bold")
     ax.text(1.42, floor_pct * 100 + 0.13, "floor 2.5%", color=COLORS["floor"], fontweight="bold")
 
@@ -422,7 +439,7 @@ def plot_spending_rule(results: dict) -> None:
     ax.set_xlim(0, 1.65)
     ax.set_ylim(0, 6.05)
     ax.set_xticks([floor_threshold, 0.5, 1.0, 1.5])
-    ax.set_xticklabels(["0.025x", "0.50x", "1.00x", "1.50x"])
+    ax.set_xticklabels(["0.025x\n1 floor year", "0.50x", "1.00x", "1.50x"])
     style_axis(ax)
     fig.subplots_adjust(top=0.82, left=0.08, right=0.97, bottom=0.14)
     save(fig, "bond_report_spending_cap.png")
@@ -442,7 +459,7 @@ def plot_safe_withdrawal_search(results: dict) -> None:
     title_block(
         fig,
         "Safe Withdrawal Search",
-        "Zero cash and zero bonds; floor is always 50% of the target spending rate.",
+        "Zero cash and zero bonds; 30-year horizon, 20,000 paths, 5-year historical blocks; floor is 50% of target.",
     )
 
     ax1.plot(xs, [r["target_shortfall_pct"] for r in rows], marker="o", color=COLORS["target"], linewidth=2.8)
@@ -451,14 +468,14 @@ def plot_safe_withdrawal_search(results: dict) -> None:
     ax1.axvspan(4, 5.05, color="#d9eadf", alpha=0.55)
     ax1.axvspan(6.0, 7.0, color=COLORS["accent_light"], alpha=0.45)
     ax1.axvspan(8.0, 10.0, color="#f2c8ce", alpha=0.45)
-    ax1.text(4.15, 51, "durable", color=COLORS["floor"], fontweight="bold")
-    ax1.text(6.05, 51, "aggressive", color=COLORS["accent"], fontweight="bold")
-    ax1.text(8.25, 51, "fragile", color=COLORS["target"], fontweight="bold")
+    ax1.text(4.15, 61, "durable", color=COLORS["floor"], fontweight="bold")
+    ax1.text(6.05, 61, "aggressive", color=COLORS["accent"], fontweight="bold")
+    ax1.text(8.25, 61, "fragile", color=COLORS["target"], fontweight="bold")
     annotate_endpoint(ax1, xs[-1], rows[-1]["target_shortfall_pct"], "target shortfall", COLORS["target"])
     annotate_endpoint(ax1, xs[-1], rows[-1]["floor_breach_pct"], "floor breach", COLORS["floor"])
     annotate_endpoint(ax1, xs[-1], rows[-1]["ruin_pct"], "ruin", COLORS["ruin"])
     ax1.set_ylabel("Risk / shortfall rate (%)")
-    ax1.set_ylim(0, 60)
+    ax1.set_ylim(0, 70)
     style_axis(ax1)
 
     ax2.bar(xs, [r["final_p10_multiple"] for r in rows], width=0.52, color=COLORS["wealth_light"], label="10th percentile")
@@ -480,34 +497,41 @@ def plot_tradeoff_rows(
     subtitle: str,
     filename: str,
     xlabel: str,
+    x_values: list[float] | None = None,
 ) -> None:
-    xs = np.arange(len(rows))
-    fig, (ax1, ax2) = plt.subplots(
-        2,
+    xs = np.array(x_values if x_values is not None else list(range(len(rows))), dtype=float)
+    fig, (ax1, ax2, ax3) = plt.subplots(
+        3,
         1,
-        figsize=(10.6, 7.1),
+        figsize=(10.8, 8.2),
         sharex=True,
-        gridspec_kw={"height_ratios": [1.9, 1.2], "hspace": 0.14},
+        gridspec_kw={"height_ratios": [1.45, 1.15, 1.25], "hspace": 0.16},
     )
     title_block(fig, title, subtitle)
 
-    width = 0.34
-    ax1.bar(xs - width / 2, [r["target_shortfall_pct"] for r in rows], width, color=COLORS["target"], label="Target shortfall")
-    ax1.bar(xs + width / 2, [r["floor_breach_pct"] for r in rows], width, color=COLORS["floor"], label="Floor breach")
-    ax1.plot(xs, [r["ruin_pct"] for r in rows], marker="o", color=COLORS["ruin"], linewidth=2.0, label="Ruin")
-    ax1.set_ylabel("Risk / shortfall rate (%)")
-    ax1.legend(frameon=False, ncol=3, loc="upper left")
+    ax1.plot(xs, [r["target_shortfall_pct"] for r in rows], marker="o", color=COLORS["target"], linewidth=2.8)
+    ax1.set_ylabel("Target shortfall\npath-years (%)")
+    ax1.set_ylim(0, max(r["target_shortfall_pct"] for r in rows) * 1.22)
     style_axis(ax1)
 
-    ax2.bar(xs, [r["final_p10_multiple"] for r in rows], color=COLORS["wealth_light"], width=0.55, label="10th percentile")
-    ax2.plot(xs, [r["final_median_multiple"] for r in rows], marker="s", color=COLORS["wealth"], linewidth=2.6, label="median")
-    ax2.set_ylabel("Ending wealth (x)")
-    ax2.set_xlabel(xlabel)
-    ax2.set_xticks(xs, x_labels)
-    ax2.legend(frameon=False, loc="upper right")
+    ax2.plot(xs, [r["ruin_pct"] for r in rows], marker="o", color=COLORS["ruin"], linewidth=2.4, label="Ruin")
+    ax2.plot(xs, [r["floor_breach_pct"] for r in rows], marker="o", color=COLORS["floor"], linewidth=2.4, label="Floor breach")
+    small_risk_max = max(max(r["ruin_pct"], r["floor_breach_pct"]) for r in rows)
+    ax2.set_ylim(0, max(1.5, small_risk_max * 1.35))
+    ax2.set_ylabel("Ruin / floor\nbreach (%)")
+    ax2.legend(frameon=False, ncol=2, loc="upper right")
     style_axis(ax2)
 
-    fig.subplots_adjust(top=0.84, left=0.08, right=0.96, bottom=0.11)
+    bar_width = 0.55 if x_values is None else max(0.22, min(0.6, (xs[1] - xs[0]) * 0.45 if len(xs) > 1 else 0.55))
+    ax3.bar(xs, [r["final_p10_multiple"] for r in rows], color=COLORS["wealth_light"], width=bar_width, label="10th percentile")
+    ax3.plot(xs, [r["final_median_multiple"] for r in rows], marker="s", color=COLORS["wealth"], linewidth=2.6, label="median")
+    ax3.set_ylabel("Real ending\nwealth (x)")
+    ax3.set_xlabel(xlabel)
+    ax3.set_xticks(xs, x_labels)
+    ax3.legend(frameon=False, loc="upper right")
+    style_axis(ax3)
+
+    fig.subplots_adjust(top=0.84, left=0.1, right=0.96, bottom=0.11)
     save(fig, filename)
 
 
@@ -516,10 +540,11 @@ def plot_cash_buffer(results: dict) -> None:
     plot_tradeoff_rows(
         rows=rows,
         x_labels=[f"{row['buffer_years']}y" for row in rows],
-        title="Cash Buffer Tradeoff",
-        subtitle="More cash slightly reduces floor risk, but it also raises target shortfall and lowers ending wealth.",
+        title="T-Bill Cash Buffer Tradeoff",
+        subtitle="5% target / 2.5% floor, 30 years, 20,000 paths; x-axis spacing reflects actual buffer years.",
         filename="bond_report_cash_buffer.png",
         xlabel="Cash buffer measured in years of target spending",
+        x_values=[row["buffer_years"] for row in rows],
     )
 
 
@@ -529,7 +554,7 @@ def plot_history_sensitivity(results: dict) -> None:
         rows=rows,
         x_labels=[f"{row['history_years']}y" for row in rows],
         title="Historical Window Sensitivity",
-        subtitle="The Depression-inclusive 99-year window is a materially harsher stress test than the 75-year baseline.",
+        subtitle="50y starts after 1973-74; 75y includes 1970s inflation; 98y includes Depression/WWII regimes.",
         filename="bond_report_history_sensitivity.png",
         xlabel="Historical lookback window",
     )
@@ -539,58 +564,45 @@ def plot_bond_allocation(results: dict) -> None:
     rows = results["bond_rows"]
     xs = np.array([row["bond_pct"] * 100 for row in rows])
 
-    fig, (ax1, ax2) = plt.subplots(
-        2,
+    fig, (ax1, ax2, ax3) = plt.subplots(
+        3,
         1,
-        figsize=(10.8, 7.4),
+        figsize=(10.8, 8.5),
         sharex=True,
-        gridspec_kw={"height_ratios": [1.9, 1.2], "hspace": 0.14},
+        gridspec_kw={"height_ratios": [1.45, 1.15, 1.25], "hspace": 0.16},
     )
     title_block(
         fig,
         "Bond Allocation Tradeoff",
-        "Bonds lower floor risk, but the target lifestyle and median ending wealth deteriorate as the bond sleeve grows.",
+        "5% target / 2.5% floor, 30 years, 20,000 matched historical-block paths.",
     )
 
     ax1.axvspan(40, 60, color="#f2c8ce", alpha=0.4)
     ax1.plot(xs, [r["target_shortfall_pct"] for r in rows], marker="o", color=COLORS["target"], linewidth=2.8)
-    ax1.plot(xs, [r["floor_breach_pct"] for r in rows], marker="o", color=COLORS["floor"], linewidth=2.5)
-    ax1.plot(xs, [r["ruin_pct"] for r in rows], marker="o", color=COLORS["ruin"], linewidth=2.2)
-    ax1.text(41, 43, "high-bond drag", color=COLORS["target"], fontweight="bold")
+    ax1.text(41, 45, "high-bond region:\nmore shortfall,\nlower ending wealth", color=COLORS["target"], fontweight="bold")
     annotate_endpoint(ax1, xs[-1], rows[-1]["target_shortfall_pct"], "target shortfall", COLORS["target"])
-    ax1.annotate(
-        "floor breach: 0%",
-        xy=(xs[-1], rows[-1]["floor_breach_pct"]),
-        xytext=(8, 14),
-        textcoords="offset points",
-        va="center",
-        fontsize=9.5,
-        color=COLORS["floor"],
-        fontweight="bold",
-    )
-    ax1.annotate(
-        "ruin: 0%",
-        xy=(xs[-1], rows[-1]["ruin_pct"]),
-        xytext=(8, -10),
-        textcoords="offset points",
-        va="center",
-        fontsize=9.5,
-        color=COLORS["ruin"],
-        fontweight="bold",
-    )
-    ax1.set_ylabel("Risk / shortfall rate (%)")
+    ax1.set_ylabel("Target shortfall\npath-years (%)")
     ax1.set_ylim(0, 54)
     style_axis(ax1)
 
-    ax2.bar(xs, [r["final_p10_multiple"] for r in rows], width=6, color=COLORS["wealth_light"], label="10th percentile")
-    ax2.plot(xs, [r["final_median_multiple"] for r in rows], marker="s", color=COLORS["wealth"], linewidth=2.6, label="median")
-    annotate_endpoint(ax2, xs[-1], rows[-1]["final_median_multiple"], "median wealth", COLORS["wealth"])
-    ax2.set_ylabel("Ending wealth (x)")
-    ax2.set_xlabel("Bond allocation (% of non-cash portfolio)")
-    ax2.set_xticks(xs, [pct_label(x) for x in xs])
-    ax2.legend(frameon=False, loc="upper right")
+    ax2.plot(xs, [r["ruin_pct"] for r in rows], marker="o", color=COLORS["ruin"], linewidth=2.4, label="Ruin")
+    ax2.plot(xs, [r["floor_breach_pct"] for r in rows], marker="o", color=COLORS["floor"], linewidth=2.4, label="Floor breach")
+    annotate_endpoint(ax2, xs[-1], rows[-1]["ruin_pct"], f"ruin {rows[-1]['ruin_pct']:.2f}%", COLORS["ruin"])
+    annotate_endpoint(ax2, xs[-1], rows[-1]["floor_breach_pct"], f"floor {rows[-1]['floor_breach_pct']:.2f}%", COLORS["floor"])
+    ax2.set_ylabel("Ruin / floor\nbreach (%)")
+    ax2.set_ylim(0, 1.35)
+    ax2.legend(frameon=False, ncol=2, loc="upper right")
     style_axis(ax2)
-    fig.subplots_adjust(top=0.84, left=0.08, right=0.88, bottom=0.1)
+
+    ax3.bar(xs, [r["final_p10_multiple"] for r in rows], width=6, color=COLORS["wealth_light"], label="10th percentile")
+    ax3.plot(xs, [r["final_median_multiple"] for r in rows], marker="s", color=COLORS["wealth"], linewidth=2.6, label="median")
+    annotate_endpoint(ax3, xs[-1], rows[-1]["final_median_multiple"], "median wealth", COLORS["wealth"])
+    ax3.set_ylabel("Real ending\nwealth (x)")
+    ax3.set_xlabel("Bond allocation (% of non-cash portfolio)")
+    ax3.set_xticks(xs, [pct_label(x) for x in xs])
+    ax3.legend(frameon=False, loc="upper right")
+    style_axis(ax3)
+    fig.subplots_adjust(top=0.84, left=0.1, right=0.88, bottom=0.1)
     save(fig, "bond_report_bond_allocation.png")
 
 
@@ -601,7 +613,7 @@ def plot_objective_tradeoff(results: dict) -> None:
     title_block(
         fig,
         "Objective Tradeoff",
-        "More bonds moved the portfolio toward lower ending wealth and more target shortfall.",
+        "5% target / 2.5% floor, 30-year horizon, 20,000 matched historical-block paths.",
     )
 
     x = [row["target_shortfall_pct"] for row in rows]
@@ -633,12 +645,57 @@ def plot_objective_tradeoff(results: dict) -> None:
         fontsize=10,
     )
     ax.set_xlabel("Target shortfall (% of simulated path-years)")
-    ax.set_ylabel("Median ending wealth (x starting portfolio)")
+    ax.set_ylabel("Real median ending wealth (x starting portfolio)")
     ax.set_xlim(17, 52)
     ax.set_ylim(0.4, 4.7)
     style_axis(ax, grid_axis="both")
     fig.subplots_adjust(top=0.82, left=0.1, right=0.96, bottom=0.13)
     save(fig, "bond_report_objective_tradeoff.png")
+
+
+def plot_objective_tradeoff_combined(results: dict) -> None:
+    fig, ax = plt.subplots(figsize=(9.8, 6.7))
+    title_block(
+        fig,
+        "Objective Tradeoff: 4% And 5% Targets",
+        "Both lines use 2:1 target/floor spending, zero cash, 30 years, 20,000 matched historical-block paths.",
+    )
+
+    series = [
+        ("4% target", results["bond_rows_4pct"], COLORS["wealth"], "o"),
+        ("5% target", results["bond_rows"], COLORS["accent"], "s"),
+    ]
+    for label, rows, color, marker in series:
+        x = [row["target_shortfall_pct"] for row in rows]
+        y = [row["final_median_multiple"] for row in rows]
+        ax.plot(x, y, color=color, linewidth=2.5, marker=marker, markersize=7, label=label)
+        for row in rows:
+            if row["bond_pct"] in [0.0, 0.4, 0.6]:
+                ax.annotate(
+                    f"{row['bond_pct']:.0%} bonds",
+                    xy=(row["target_shortfall_pct"], row["final_median_multiple"]),
+                    xytext=(8, 5),
+                    textcoords="offset points",
+                    fontsize=8.8,
+                    color=COLORS["ink"],
+                )
+
+    ax.annotate(
+        "higher bond allocation",
+        xy=(51.7, 0.83),
+        xytext=(27.5, 3.35),
+        arrowprops={"arrowstyle": "->", "color": COLORS["muted"], "linewidth": 1.4},
+        color=COLORS["muted"],
+        fontsize=10,
+    )
+    ax.set_xlabel("Target shortfall (% of simulated path-years)")
+    ax.set_ylabel("Real median ending wealth (x starting portfolio)")
+    ax.set_xlim(17, 54)
+    ax.set_ylim(0.4, 4.7)
+    ax.legend(frameon=False, loc="upper right")
+    style_axis(ax, grid_axis="both")
+    fig.subplots_adjust(top=0.82, left=0.1, right=0.96, bottom=0.13)
+    save(fig, "bond_report_objective_tradeoff_4_5.png")
 
 
 def main() -> None:
@@ -651,6 +708,7 @@ def main() -> None:
     plot_history_sensitivity(results)
     plot_bond_allocation(results)
     plot_objective_tradeoff(results)
+    plot_objective_tradeoff_combined(results)
 
 
 if __name__ == "__main__":

@@ -43,10 +43,12 @@ def summarize(results: dict, target_spend: float, floor_spend: float) -> dict:
     final = results["portfolio_values"][-1]
     withdrawals = results["withdrawal_values"]
 
+    ruin_mask = final <= 1e-6
     target_mask = withdrawals < (target_spend - 1e-6)
     floor_mask = withdrawals < (floor_spend - 1e-6)
     shortfall_counts = target_mask.sum(axis=0)
     affected_counts = shortfall_counts[shortfall_counts > 0]
+    shortfall_loss = np.maximum(target_spend - withdrawals, 0.0) / target_spend
 
     if np.any(target_mask):
         shortfall_withdrawals = withdrawals[target_mask]
@@ -59,15 +61,20 @@ def summarize(results: dict, target_spend: float, floor_spend: float) -> dict:
         avg_shortfall_depth_pct_target = 0.0
 
     return {
-        "ruin_pct": float(np.mean(final <= 1e-6) * 100),
+        "ruin_pct": float(np.mean(ruin_mask) * 100),
+        "ruin_count": int(np.sum(ruin_mask)),
         "target_shortfall_pct": float(np.mean(target_mask) * 100),
+        "target_shortfall_path_years": int(np.sum(target_mask)),
         "target_shortfall_ever_pct": float(np.mean(np.any(target_mask, axis=0)) * 100),
         "target_shortfall_median_years_if_any": (
             float(np.median(affected_counts)) if len(affected_counts) else 0.0
         ),
         "target_shortfall_avg_spend_pct_initial": avg_shortfall_spend_pct_initial,
         "target_shortfall_avg_depth_pct_target": avg_shortfall_depth_pct_target,
+        "target_shortfall_integrated_loss_pct_target": float(np.mean(shortfall_loss) * 100),
+        "target_shortfall_integrated_loss_years": float(np.mean(shortfall_loss.sum(axis=0))),
         "floor_breach_pct": float(np.mean(floor_mask) * 100),
+        "floor_breach_path_years": int(np.sum(floor_mask)),
         "floor_breach_ever_pct": float(np.mean(np.any(floor_mask, axis=0)) * 100),
         "final_p5_multiple": float(np.percentile(final / BASE, 5)),
         "final_p10_multiple": float(np.percentile(final / BASE, 10)),
@@ -145,6 +152,39 @@ def run_bond_simulation(
         bond_allocation_pct=bond_pct,
     )
     return summarize(results, target_spend=target_spend, floor_spend=floor_spend)
+
+
+def run_fixed_real_bond_simulation(
+    asset_history: dict,
+    bond_pct: float,
+    withdrawal_pct: float,
+) -> dict:
+    """Run a fixed real withdrawal benchmark without target/floor flexibility."""
+    withdrawal = BASE * withdrawal_pct
+    market = PairedBlockBootstrapMarket(
+        stock_returns=asset_history["stock_returns"],
+        bond_returns=asset_history["bond_returns"],
+        inflation_rates=asset_history["inflation_rates"],
+        cash_returns=asset_history["tbill_returns"],
+        block_size=BLOCK_SIZE,
+    )
+    np.random.seed(SEED)
+    results = run_simulation(
+        initial_net_worth=BASE,
+        annual_spend=withdrawal,
+        minimum_annual_spend=withdrawal,
+        buffer_years=0,
+        years=YEARS,
+        panic_threshold=PANIC_THRESHOLD,
+        inflation_rate=FALLBACK_INFLATION_RATE,
+        n_paths=N_PATHS,
+        market_model=market,
+        spending_cap_pct=1.0,
+        cash_interest_rate=CASH_RATE,
+        strategy=ConservativeStrategy(),
+        bond_allocation_pct=bond_pct,
+    )
+    return summarize(results, target_spend=withdrawal, floor_spend=withdrawal)
 
 
 def main() -> None:
@@ -241,10 +281,10 @@ def main() -> None:
 
     traditional_benchmark_rows = []
     for spending_cap_pct, bond_pct, label in [
-        (0.04, 0.0, "4% stock-only"),
-        (0.04, 0.4, "4% 60/40"),
-        (0.05, 0.0, "5% stock-only"),
-        (0.05, 0.4, "5% 60/40"),
+        (0.04, 0.0, "4% target / 2% floor, stock-only flexible rule"),
+        (0.04, 0.4, "4% target / 2% floor, 60/40 flexible rule"),
+        (0.05, 0.0, "5% target / 2.5% floor, stock-only flexible rule"),
+        (0.05, 0.4, "5% target / 2.5% floor, 60/40 flexible rule"),
     ]:
         target_spend, floor_spend = derive_spending_targets(
             BASE,
@@ -266,6 +306,23 @@ def main() -> None:
             )
         )
         traditional_benchmark_rows.append(row)
+
+    fixed_row = {
+        "label": "Fixed real 4% withdrawal, 60/40, no spending flexibility",
+        "spending_cap_pct": None,
+        "target_spending_pct_initial": 0.04,
+        "floor_spending_pct_initial": None,
+        "bond_pct": 0.4,
+        "rule": "fixed_real",
+    }
+    fixed_row.update(
+        run_fixed_real_bond_simulation(
+            baseline_assets,
+            bond_pct=0.4,
+            withdrawal_pct=0.04,
+        )
+    )
+    traditional_benchmark_rows.append(fixed_row)
 
     results = {
         "settings": {
