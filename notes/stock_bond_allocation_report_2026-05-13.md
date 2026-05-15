@@ -167,7 +167,7 @@ The 98-year window is much harsher because it includes the Great Depression. Tha
 
 The 75-year window keeps difficult nominal-return regimes: the 1970s, 2000-2002, 2008, 2022, and other modern drawdowns. It excludes the Depression-era return path because the goal here is to test a contemporary baseline, not the most severe possible historical regime.
 
-**Conclusion:** the 75-year window is meaningfully tougher than the last 50 years because it keeps more weak stock/inflation sequences. The Depression-inclusive 98-year window is harsher again, but the main 75-year result is no longer hiding the 1970s inflation problem because inflation is sampled from the same historical years as returns.
+**Conclusion:** the 75-year window is the main baseline because it keeps modern severe sequences, including the 1970s inflation problem, while excluding the Great Depression. That exclusion is not a claim that a Depression-level collapse cannot happen. It is a scope boundary: preparing for that kind of breakdown goes beyond portfolio allocation into physical resilience, food storage, off-grid capacity, gold, cash outside the banking system, and personal security. That is a different plan from a retirement withdrawal model.
 
 ## Experiment 3: Safe Withdrawal Search
 
