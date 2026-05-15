@@ -357,7 +357,7 @@ The sharper conclusion is:
 
 ## Limitations
 
-This is a model result, not personalized financial advice. Important limitations:
+Important limitations:
 
 - Taxes are ignored.
 - Fees are ignored.
