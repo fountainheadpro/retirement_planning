@@ -221,6 +221,18 @@ def main() -> None:
         )
         block_size_rows.append(row)
 
+    bond_rows_4pct = []
+    for bond_pct in [0.0, 0.1, 0.2, 0.4, 0.6]:
+        row = {"bond_pct": bond_pct}
+        row.update(
+            run_bond_simulation(
+                baseline_assets,
+                bond_pct,
+                spending_cap_pct=0.04,
+            )
+        )
+        bond_rows_4pct.append(row)
+
     bond_rows = []
     for bond_pct in [0.0, 0.1, 0.2, 0.4, 0.6]:
         row = {"bond_pct": bond_pct}
@@ -283,6 +295,7 @@ def main() -> None:
         "history_rows": history_rows,
         "block_size_rows": block_size_rows,
         "traditional_benchmark_rows": traditional_benchmark_rows,
+        "bond_rows_4pct": bond_rows_4pct,
         "bond_rows": bond_rows,
         "stock_bond_years": [
             int(baseline_assets["years"][0]),

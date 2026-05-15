@@ -211,7 +211,7 @@ The next table explains what "target shortfall" means in lived-path terms. The f
 
 For example, at the 5% target, 24.73% of all simulated path-years are below target. Across paths, 64.46% experience at least one target miss. Among those affected paths, the median path has 9 shortfall years, and the average shortfall-year withdrawal is 3.63% of the initial portfolio instead of 5%.
 
-**Conclusion:** sampling inflation makes every spending level more stressful than the fixed-3% version. The practical range still centers around 4-5% for this flexible target/floor rule. At 6%, ruin and floor breach become noticeable; above that, the plan depends too heavily on favorable sequences.
+**Conclusion:** the search turns the withdrawal rate into a quantifiable risk choice rather than a single magic number. Both 4% and 5% have low ruin risk in this model, but 4% makes that risk much lower: 0.23% ruin versus 1.21% at 5%. The tradeoff is lifestyle. A retiree can choose how much target shortfall, floor risk, and ending-wealth uncertainty they are willing to accept; above 6%, the plan starts depending too heavily on favorable sequences.
 
 ## Experiment 4: Block Size Sensitivity
 
@@ -229,6 +229,20 @@ This experiment keeps the 5% target, 2.5% floor, zero cash, zero bonds, and 75-y
 ## Experiment 5: Bonds
 
 This experiment removes the cash buffer and varies the bond allocation from 0% to 60% of the non-cash portfolio. Bonds are modeled as 10-year Treasury total returns, paired with S&P 500 total returns from the same historical blocks.
+
+Two spending targets are shown. The 4% table tests the traditional withdrawal-rate baseline. The 5% table tests the higher flexible-spending target used elsewhere in the report.
+
+### 4% Target / 2% Floor
+
+| Bond allocation | Ruin | Target shortfall | Floor breach | Final p10 | Final median |
+|---:|---:|---:|---:|---:|---:|
+| 0% bonds | 0.23% | 19.40% | 0.03% | 0.86x | 4.27x |
+| 10% bonds | 0.10% | 19.79% | 0.01% | 0.85x | 3.68x |
+| 20% bonds | 0.05% | 21.02% | 0.01% | 0.82x | 3.09x |
+| 40% bonds | 0.01% | 26.01% | 0.00% | 0.70x | 2.06x |
+| 60% bonds | 0.01% | 37.93% | 0.00% | 0.55x | 1.24x |
+
+### 5% Target / 2.5% Floor
 
 Because this experiment uses the same Damodaran S&P 500 total-return series as the stock-only experiments, the 0% bond row matches the 5% zero-cash baseline above.
 
@@ -264,7 +278,7 @@ This companion table is why the target-shortfall metric should not be read as a 
 
 The objective chart isolates the bond decision: each step toward more bonds moves down and to the right, toward lower median ending wealth and higher target shortfall.
 
-**Conclusion:** bonds reduce ruin and floor-breach risk, but they do not improve the target/floor objective. The traditional 60/40 row cuts ruin from 1.21% to 0.31%, while target shortfall rises from 24.73% to 36.13% and median ending wealth falls from 3.32x to 1.41x.
+**Conclusion:** bonds reduce ruin and floor-breach risk, but they do not improve the target/floor objective. At 4%, stock-only already has a 0.23% ruin rate; 60/40 cuts that to 0.01%, but target shortfall rises from 19.40% to 26.01% and median ending wealth falls from 4.27x to 2.06x. At 5%, the same tradeoff appears at a higher spending level: 60/40 cuts ruin from 1.21% to 0.31%, while target shortfall rises and median wealth falls sharply.
 
 ## Interpretation
 

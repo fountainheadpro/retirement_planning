@@ -466,6 +466,88 @@
       "median_withdrawal_y30_pct_initial": 0.05
     }
   ],
+  "bond_rows_4pct": [
+    {
+      "bond_pct": 0.0,
+      "ruin_pct": 0.22999999999999998,
+      "target_shortfall_pct": 19.399166666666666,
+      "target_shortfall_ever_pct": 61.045,
+      "target_shortfall_median_years_if_any": 6.0,
+      "target_shortfall_avg_spend_pct_initial": 0.02995164642425694,
+      "target_shortfall_avg_depth_pct_target": 0.2512088393935764,
+      "floor_breach_pct": 0.03233333333333333,
+      "floor_breach_ever_pct": 0.22999999999999998,
+      "final_p5_multiple": 0.559495060519913,
+      "final_p10_multiple": 0.8615778064840606,
+      "final_median_multiple": 4.267035281797122,
+      "median_withdrawal_y1_pct_initial": 0.04,
+      "median_withdrawal_y30_pct_initial": 0.04
+    },
+    {
+      "bond_pct": 0.1,
+      "ruin_pct": 0.095,
+      "target_shortfall_pct": 19.791666666666664,
+      "target_shortfall_ever_pct": 59.830000000000005,
+      "target_shortfall_median_years_if_any": 7.0,
+      "target_shortfall_avg_spend_pct_initial": 0.030533057951378836,
+      "target_shortfall_avg_depth_pct_target": 0.2366735512155291,
+      "floor_breach_pct": 0.0125,
+      "floor_breach_ever_pct": 0.095,
+      "final_p5_multiple": 0.5828707876581508,
+      "final_p10_multiple": 0.8500113896379222,
+      "final_median_multiple": 3.676202508437224,
+      "median_withdrawal_y1_pct_initial": 0.04,
+      "median_withdrawal_y30_pct_initial": 0.04
+    },
+    {
+      "bond_pct": 0.2,
+      "ruin_pct": 0.05,
+      "target_shortfall_pct": 21.015666666666664,
+      "target_shortfall_ever_pct": 61.334999999999994,
+      "target_shortfall_median_years_if_any": 7.0,
+      "target_shortfall_avg_spend_pct_initial": 0.031142319816994554,
+      "target_shortfall_avg_depth_pct_target": 0.22144200457513621,
+      "floor_breach_pct": 0.005333333333333333,
+      "floor_breach_ever_pct": 0.05,
+      "final_p5_multiple": 0.5848329512003425,
+      "final_p10_multiple": 0.8155933612103097,
+      "final_median_multiple": 3.093646339130793,
+      "median_withdrawal_y1_pct_initial": 0.04,
+      "median_withdrawal_y30_pct_initial": 0.04
+    },
+    {
+      "bond_pct": 0.4,
+      "ruin_pct": 0.005,
+      "target_shortfall_pct": 26.011,
+      "target_shortfall_ever_pct": 65.21000000000001,
+      "target_shortfall_median_years_if_any": 9.0,
+      "target_shortfall_avg_spend_pct_initial": 0.03182046980411975,
+      "target_shortfall_avg_depth_pct_target": 0.2044882548970063,
+      "floor_breach_pct": 0.0005,
+      "floor_breach_ever_pct": 0.005,
+      "final_p5_multiple": 0.5430214711247718,
+      "final_p10_multiple": 0.697003590197977,
+      "final_median_multiple": 2.055830963167205,
+      "median_withdrawal_y1_pct_initial": 0.04,
+      "median_withdrawal_y30_pct_initial": 0.04
+    },
+    {
+      "bond_pct": 0.6,
+      "ruin_pct": 0.005,
+      "target_shortfall_pct": 37.92783333333333,
+      "target_shortfall_ever_pct": 76.285,
+      "target_shortfall_median_years_if_any": 15.0,
+      "target_shortfall_avg_spend_pct_initial": 0.03158608817527168,
+      "target_shortfall_avg_depth_pct_target": 0.21034779561820807,
+      "floor_breach_pct": 0.00016666666666666666,
+      "floor_breach_ever_pct": 0.005,
+      "final_p5_multiple": 0.44218969643118755,
+      "final_p10_multiple": 0.5469947882409374,
+      "final_median_multiple": 1.2426100165479856,
+      "median_withdrawal_y1_pct_initial": 0.04,
+      "median_withdrawal_y30_pct_initial": 0.04
+    }
+  ],
   "bond_rows": [
     {
       "bond_pct": 0.0,

@@ -631,7 +631,7 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
               </tbody>
             </table>
           </div>
-          <p class="callout"><b>Conclusion:</b> sampling inflation makes every spending level more stressful than the fixed-3% version. The practical range still centers around 4-5% for this flexible target/floor rule. At 6%, ruin and floor breach become noticeable; above that, the plan depends too heavily on favorable sequences.</p>
+          <p class="callout"><b>Conclusion:</b> the search turns the withdrawal rate into a quantifiable risk choice rather than a single magic number. Both 4% and 5% have low ruin risk in this model, but 4% makes that risk much lower: 0.23% ruin versus 1.21% at 5%. The tradeoff is lifestyle. A retiree can choose how much target shortfall, floor risk, and ending-wealth uncertainty they are willing to accept; above 6%, the plan starts depending too heavily on favorable sequences.</p>
         </section>
 
         <section id="block-size">
@@ -656,6 +656,23 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
         <section id="bonds">
           <h2>Experiment 5: Bonds And 60/40</h2>
           <p>This experiment removes the cash buffer and varies the bond allocation from 0% to 60% of the non-cash portfolio. Bonds are modeled as 10-year Treasury total returns, paired with S&amp;P 500 total returns from the same historical blocks. The 40% bond row is the traditional 60/40 portfolio.</p>
+          <p>Two spending targets are shown. The 4% table tests the traditional withdrawal-rate baseline. The 5% table tests the higher flexible-spending target used elsewhere in the report.</p>
+          <h3>4% Target / 2% Floor</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Bond allocation</th><th>Ruin</th><th>Target shortfall</th><th>Floor breach</th><th>Final p10</th><th>Final median</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>0% bonds</td><td>0.23%</td><td>19.40%</td><td>0.03%</td><td>0.86x</td><td>4.27x</td></tr>
+                <tr><td>10% bonds</td><td>0.10%</td><td>19.79%</td><td>0.01%</td><td>0.85x</td><td>3.68x</td></tr>
+                <tr><td>20% bonds</td><td>0.05%</td><td>21.02%</td><td>0.01%</td><td>0.82x</td><td>3.09x</td></tr>
+                <tr><td>40% bonds</td><td>0.01%</td><td>26.01%</td><td>0.00%</td><td>0.70x</td><td>2.06x</td></tr>
+                <tr><td>60% bonds</td><td>0.01%</td><td>37.93%</td><td>0.00%</td><td>0.55x</td><td>1.24x</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <h3>5% Target / 2.5% Floor</h3>
           <div class="table-wrap">
             <table>
               <thead>
@@ -702,7 +719,7 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
             <img src="assets/bond_report_objective_tradeoff.png" alt="Objective tradeoff chart.">
             <figcaption>Each step toward more bonds moves down and to the right: lower median ending wealth and higher target shortfall.</figcaption>
           </figure>
-          <p class="callout"><b>Conclusion:</b> bonds reduce ruin and floor-breach risk, but they do not improve the target/floor objective. The traditional 60/40 row cuts ruin from 1.21% to 0.31%, while target shortfall rises from 24.73% to 36.13% and median ending wealth falls from 3.32x to 1.41x.</p>
+          <p class="callout"><b>Conclusion:</b> bonds reduce ruin and floor-breach risk, but they do not improve the target/floor objective. At 4%, stock-only already has a 0.23% ruin rate; 60/40 cuts that to 0.01%, but target shortfall rises from 19.40% to 26.01% and median ending wealth falls from 4.27x to 2.06x. At 5%, the same tradeoff appears at a higher spending level: 60/40 cuts ruin from 1.21% to 0.31%, while target shortfall rises and median wealth falls sharply.</p>
         </section>
 
         <section id="interpretation">
