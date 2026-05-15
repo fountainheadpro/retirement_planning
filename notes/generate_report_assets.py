@@ -99,43 +99,125 @@ def plot_spending_rule(results: dict) -> None:
     settings = results["settings"]
     target_pct = settings["target_spending_pct_initial"]
     floor_pct = settings["floor_spending_pct_initial"]
+    floor_threshold = floor_pct
+    floor_to_cap_threshold = floor_pct / target_pct
+    target_threshold = 1.0
 
-    x = np.linspace(0, 2.0, 400)
+    x = np.linspace(0, 1.65, 500)
     cap_spend = x * target_pct
     desired = np.minimum(np.maximum(np.minimum(target_pct, cap_spend), floor_pct), x)
 
-    fig, ax = plt.subplots(figsize=(10.5, 5.7))
+    fig, ax = plt.subplots(figsize=(11.2, 6.2))
     title_block(
         fig,
-        "Spending Rule: Target, Cap, And Floor",
-        "The current-portfolio cap forces target shortfall when wealth falls below the starting portfolio.",
+        "Spending Rule: Four Lifestyle Regimes",
+        "The floor protects mandatory spending; the cap cuts discretionary spending before ruin.",
     )
 
-    ax.fill_between(x, 0, desired * 100, color="#d9eadf", alpha=0.8)
-    ax.fill_between(
+    regimes = [
+        (0.0, floor_threshold, "#f8d7da", "floor breach", "assets cannot fund minimum"),
+        (floor_threshold, floor_to_cap_threshold, "#e7f1ee", "floor funded", "mandatory spending only"),
+        (floor_to_cap_threshold, target_threshold, "#fff0d6", "target shortfall", "discretionary lifestyle cut"),
+        (target_threshold, 1.65, "#dff0e6", "target funded", "full preferred lifestyle"),
+    ]
+    for start, end, color, _, _ in regimes:
+        ax.axvspan(start, end, color=color, alpha=0.92, zorder=0)
+
+    ax.plot(
         x,
         desired * 100,
-        target_pct * 100,
-        where=x < 1.0,
-        color="#f2c8ce",
-        alpha=0.85,
+        color=COLORS["target"],
+        linewidth=3.4,
+        solid_capstyle="round",
+        zorder=4,
     )
-    ax.plot(x, desired * 100, color=COLORS["target"], linewidth=3.0)
-    ax.axhline(target_pct * 100, color=COLORS["target"], linestyle="--", linewidth=1.6)
-    ax.axhline(floor_pct * 100, color=COLORS["floor"], linestyle="--", linewidth=1.6)
-    ax.axvline(1.0, color=COLORS["muted"], linestyle=":", linewidth=1.4)
 
-    ax.text(1.02, target_pct * 100 + 0.15, "target reachable above 1.0x", color=COLORS["target"])
-    ax.text(0.12, floor_pct * 100 + 0.15, "floor", color=COLORS["floor"], fontweight="bold")
-    ax.text(0.38, 4.4, "target shortfall zone", color=COLORS["target"], fontweight="bold")
-    ax.text(1.05, 0.35, "starting portfolio", color=COLORS["muted"])
+    ax.axhline(target_pct * 100, color=COLORS["target"], linestyle=(0, (5, 3)), linewidth=1.7)
+    ax.axhline(floor_pct * 100, color=COLORS["floor"], linestyle=(0, (5, 3)), linewidth=1.7)
+    ax.axvline(floor_to_cap_threshold, color=COLORS["muted"], linestyle=":", linewidth=1.4)
+    ax.axvline(target_threshold, color=COLORS["muted"], linestyle=":", linewidth=1.4)
+
+    ax.scatter(
+        [floor_to_cap_threshold, target_threshold],
+        [floor_pct * 100, target_pct * 100],
+        s=54,
+        color=COLORS["paper"],
+        edgecolor=COLORS["target"],
+        linewidth=1.8,
+        zorder=5,
+    )
+
+    label_y = 5.55
+    ax.text(
+        0.20,
+        label_y,
+        "floor funded\nmandatory only",
+        ha="center",
+        va="center",
+        color=COLORS["floor"],
+        fontweight="bold",
+        fontsize=10,
+    )
+    ax.text(
+        0.75,
+        label_y,
+        "target shortfall\ndiscretionary cut",
+        ha="center",
+        va="center",
+        color="#9a5a15",
+        fontweight="bold",
+        fontsize=10,
+    )
+    ax.text(
+        1.30,
+        label_y,
+        "target funded\npreferred lifestyle",
+        ha="center",
+        va="center",
+        color=COLORS["floor"],
+        fontweight="bold",
+        fontsize=10,
+    )
+
+    ax.annotate(
+        "floor breach\nbelow 0.025x",
+        xy=(floor_threshold * 0.55, floor_threshold * 55),
+        xytext=(0.13, 1.05),
+        arrowprops=dict(arrowstyle="->", color=COLORS["ruin"], linewidth=1.1),
+        color=COLORS["ruin"],
+        fontsize=9.5,
+        ha="left",
+        va="center",
+    )
+    ax.annotate(
+        "cap = floor",
+        xy=(floor_to_cap_threshold, floor_pct * 100),
+        xytext=(0.47, 1.55),
+        arrowprops=dict(arrowstyle="->", color=COLORS["muted"], linewidth=1.0),
+        color=COLORS["muted"],
+        fontsize=9.5,
+        ha="right",
+    )
+    ax.annotate(
+        "cap = target",
+        xy=(target_threshold, target_pct * 100),
+        xytext=(1.03, 4.35),
+        arrowprops=dict(arrowstyle="->", color=COLORS["muted"], linewidth=1.0),
+        color=COLORS["muted"],
+        fontsize=9.5,
+        ha="left",
+    )
+    ax.text(1.42, target_pct * 100 + 0.13, "target 5%", color=COLORS["target"], fontweight="bold")
+    ax.text(1.42, floor_pct * 100 + 0.13, "floor 2.5%", color=COLORS["floor"], fontweight="bold")
 
     ax.set_xlabel("Current portfolio value (multiple of starting portfolio)")
     ax.set_ylabel("Withdrawal (% of starting portfolio)")
-    ax.set_xlim(0, 2.0)
-    ax.set_ylim(0, 6.2)
+    ax.set_xlim(0, 1.65)
+    ax.set_ylim(0, 6.05)
+    ax.set_xticks([floor_threshold, 0.5, 1.0, 1.5])
+    ax.set_xticklabels(["0.025x", "0.50x", "1.00x", "1.50x"])
     style_axis(ax)
-    fig.subplots_adjust(top=0.82, left=0.08, right=0.96, bottom=0.14)
+    fig.subplots_adjust(top=0.82, left=0.08, right=0.97, bottom=0.14)
     save(fig, "bond_report_spending_cap.png")
 
 

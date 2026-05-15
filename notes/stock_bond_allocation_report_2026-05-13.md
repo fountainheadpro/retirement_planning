@@ -91,10 +91,12 @@ The main table metric called **target shortfall** is the percentage of all simul
 
 ![Spending rule: 5% target and 2.5% floor](/Users/sergeyzelvenskiy/retirement_planning/notes/assets/bond_report_spending_cap.png)
 
+The spending-rule chart separates four lived regimes: floor breach, mandatory spending only, discretionary cuts, and full target lifestyle.
+
 The report figures use the same visual language throughout:
 
-- **Red** means target shortfall.
-- **Green** means floor breach.
+- **Red** marks target spending or target shortfall.
+- **Green** marks floor-related outcomes.
 - **Gray** means ruin.
 - **Blue** means ending wealth.
 - Shaded regions mark the part of the chart where the strategy becomes either durable, aggressive, or fragile.

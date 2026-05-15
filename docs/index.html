@@ -492,7 +492,7 @@
           <p>The classic 4% 60/40 plan looks safe if the only question is ruin. But it has more target-shortfall years and less than half the median ending wealth of the 4% stock-only plan. It also delivers a lower target lifestyle than the 5% stock-only baseline while ending with much less wealth.</p>
           <div>
             <span class="tag"><span class="dot red"></span>Red: target shortfall</span>
-            <span class="tag"><span class="dot green"></span>Green: floor breach</span>
+            <span class="tag"><span class="dot green"></span>Green: floor-related outcomes</span>
             <span class="tag"><span class="dot gray"></span>Gray: ruin</span>
             <span class="tag"><span class="dot blue"></span>Blue: ending wealth</span>
           </div>
@@ -536,8 +536,8 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
 
           <p>The floor can override the cap. If the remaining portfolio cannot fund the floor, the withdrawal is limited to the remaining portfolio, and that year is counted as a floor breach.</p>
           <figure class="figure">
-            <img src="assets/bond_report_spending_cap.png" alt="Spending rule chart showing target shortfall zone and floor.">
-            <figcaption>The spending rule cuts target spending before ruin. That is the engine behind the report’s results.</figcaption>
+            <img src="assets/bond_report_spending_cap.png" alt="Spending rule chart showing floor breach, floor funded, target shortfall, and target funded regimes.">
+            <figcaption>The spending rule creates four lived regimes: floor breach, mandatory spending only, discretionary cuts, and full target lifestyle.</figcaption>
           </figure>
 
           <h3>Model</h3>
