@@ -1,10 +1,10 @@
-# When Flexible Spending Weakens The Case For 60/40
+# The Measurable Tradeoffs Behind The 4% Rule
 
 *Date: May 14, 2026*
 
 ## Executive Summary
 
-This report starts with a realistic retiree rather than an abstract withdrawal rate.
+This report starts with a realistic retiree rather than an abstract withdrawal rate, then turns the usual conservative-versus-aggressive portfolio debate into measurable risk and quality-of-life tradeoffs.
 
 Imagine someone retiring with a portfolio of a few million dollars. Some spending is mandatory: food, basic housing, utilities, insurance, taxes, health care, and the baseline costs of staying independent. Other spending is discretionary: vacations, nicer housing, gifts, upgrades, and the parts of retirement that make life feel abundant.
 
@@ -14,6 +14,10 @@ That budget naturally creates two retirement objectives:
 - **Floor spending:** the minimum acceptable lifestyle, focused on mandatory spending.
 
 This distinction matters because the generic permanent **60/40 portfolio plus 4% rule** treats "not running out of money" as the main objective. That is too narrow. A retiree can avoid ruin and still spend too many years below the lifestyle target.
+
+The first contribution of this report is to replace vague labels like **conservative** and **aggressive** with measurable tradeoffs: odds of ruin, years below the target lifestyle, floor-breach risk, shortfall depth, and real ending wealth. The second contribution is to show why the 4% rule is conservative in this model, not as a slogan, but as a point on a risk-versus-quality-of-life curve.
+
+With zero cash and zero bonds, a 4% target has **0.23% ruin**, **19.40% target-shortfall path-years**, and **4.27x real median ending wealth**. Moving to a 5% target raises current lifestyle but also raises risk: **1.21% ruin**, **24.73% target-shortfall path-years**, and **3.32x real median ending wealth**. That is the kind of tradeoff the report is designed to make explicit.
 
 This report stress-tests the generic permanent 60/40 allocation against a target-and-floor spending model. The finding is direct: under this flexible spending objective, the generic 60/40 answer solves the easy metric, literal ruin, while weakening the harder objective, maintaining the target lifestyle.
 
