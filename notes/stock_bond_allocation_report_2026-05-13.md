@@ -224,7 +224,7 @@ This experiment keeps the 5% target, 2.5% floor, zero cash, zero bonds, and 75-y
 | 5 years | 1.21% | 24.73% | 0.20% | 0.60x | 3.32x |
 | 10 years | 2.37% | 27.44% | 0.33% | 0.44x | 2.87x |
 
-**Conclusion:** the direction of the result is not dependent on the exact 5-year block choice, but the numbers move enough to treat the second decimal place as false precision. Longer 10-year blocks produce worse outcomes here because they preserve longer bad return/inflation regimes.
+**Conclusion:** block size is a modeling assumption, not something to optimize until it best fits the past. Very short blocks break historical sequencing, but very long blocks can overfit to old macro regimes by replaying them too literally. A 5-year block is the working compromise: it preserves multi-year drawdowns and recoveries while recognizing that markets, policy response, technology, and inflation dynamics now change faster than they did in many older historical regimes.
 
 ## Experiment 5: Bonds
 

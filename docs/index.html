@@ -650,7 +650,7 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
               </tbody>
             </table>
           </div>
-          <p class="callout"><b>Conclusion:</b> the direction of the result is not dependent on the exact 5-year block choice, but the numbers move enough to treat the second decimal place as false precision. Longer 10-year blocks produce worse outcomes here because they preserve longer bad return/inflation regimes.</p>
+          <p class="callout"><b>Conclusion:</b> block size is a modeling assumption, not something to optimize until it best fits the past. Very short blocks break historical sequencing, but very long blocks can overfit to old macro regimes by replaying them too literally. A 5-year block is the working compromise: it preserves multi-year drawdowns and recoveries while recognizing that markets, policy response, technology, and inflation dynamics now change faster than they did in many older historical regimes.</p>
         </section>
 
         <section id="bonds">
