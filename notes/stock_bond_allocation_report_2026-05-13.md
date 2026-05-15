@@ -24,7 +24,7 @@ The setup is now expressed as a percentage rule, not as one hardcoded starting p
 - Spending cap during the simulation: **5% of the current portfolio value**.
 - Horizon: **30 years**.
 - Inflation: **historical CPI-U inflation**, sampled from the same calendar years as returns.
-- Cash return: **matches sampled inflation**, so cash earns 0% real return.
+- Cash return: **historical T-bill returns**, sampled from the same calendar years as stocks, bonds, and inflation.
 - Simulations: **20,000 Monte Carlo paths**.
 - Market model: **5-year historical block bootstrap**.
 - Return source: **Damodaran annual S&P 500 total returns with dividends reinvested, T-bill returns, and bond total returns**.
@@ -115,7 +115,7 @@ The method works like this:
 
 The reason for using blocks is that market returns and inflation are not independent year to year. Real markets have clusters: crashes, recoveries, inflationary periods, high-return stretches, and sideways periods. Sampling 5-year blocks preserves some of that sequence structure.
 
-For stock-only tests, the bootstrap samples Damodaran's annual S&P 500 total-return series, including dividends reinvested, joined by year to CPI inflation. For stock/bond tests, the model uses **paired block bootstrap**: stocks, bonds, and inflation are sampled from the same historical years in the same 5-year blocks. That matters because bonds and inflation should not be modeled as independent random streams. Their value depends on the same macro regime that produced the stock return.
+For stock-only tests, the bootstrap samples Damodaran's annual S&P 500 total-return series, including dividends reinvested, joined by year to T-bill returns and CPI inflation. For stock/bond tests, the model uses **paired block bootstrap**: stocks, bonds, T-bills, and inflation are sampled from the same historical years in the same 5-year blocks. That matters because bonds, cash, and inflation should not be modeled as independent random streams. Their value depends on the same macro regime that produced the stock return.
 
 The stock/bond data comes from Aswath Damodaran's annual return dataset, using S&P 500 total returns with dividends reinvested and 10-year Treasury bond total returns:
 
@@ -131,23 +131,23 @@ The chart assets are generated from `notes/assets/bond_report_results.json` by `
 
 ## Experiment 1: Cash Buffer
 
-This experiment varies the cash buffer from 0 to 5 years of target spending. A buffer is measured in years of the target withdrawal. For example, with a $5M portfolio and a 4% target, target spending is $200,000, so a 5-year cash buffer is $1M held in cash. Cash is modeled as earning the sampled inflation rate, which is equivalent to a 0% real return.
+This experiment varies the cash buffer from 0 to 5 years of target spending. A buffer is measured in years of the target withdrawal. For example, with a $5M portfolio and a 4% target, target spending is $200,000, so a 5-year cash buffer is $1M held in cash. Cash is modeled with historical T-bill returns sampled from the same years as stock returns and inflation.
 
-The remaining portfolio is invested in the Damodaran S&P 500 total-return series, using the 75-year lookback window with aligned historical inflation.
+The remaining portfolio is invested in the Damodaran S&P 500 total-return series, using the 75-year lookback window with aligned historical T-bill returns and inflation.
 
 | Cash buffer | Ruin | Target shortfall | Floor breach | Final p10 | Final median |
 |---:|---:|---:|---:|---:|---:|
 | 0 years | 1.21% | 24.73% | 0.20% | 0.60x | 3.32x |
-| 1 year | 1.09% | 25.44% | 0.17% | 0.58x | 3.11x |
-| 2 years | 1.00% | 26.80% | 0.14% | 0.55x | 2.82x |
-| 3 years | 0.93% | 28.65% | 0.12% | 0.51x | 2.50x |
-| 5 years | 0.81% | 33.86% | 0.08% | 0.41x | 1.81x |
+| 1 year | 1.09% | 25.25% | 0.17% | 0.59x | 3.13x |
+| 2 years | 1.00% | 26.43% | 0.14% | 0.56x | 2.87x |
+| 3 years | 0.92% | 28.00% | 0.12% | 0.53x | 2.57x |
+| 5 years | 0.74% | 32.68% | 0.08% | 0.43x | 1.92x |
 
 ![Cash buffer tradeoff](/Users/sergeyzelvenskiy/retirement_planning/notes/assets/bond_report_cash_buffer.png)
 
 The top panel shows the key problem: cash reduces the already-small floor risk only slightly, while target shortfall rises steadily. The bottom panel shows the cost in lower ending wealth.
 
-**Conclusion:** cash still does what cash is supposed to do: it slightly lowers ruin and floor-breach risk. But it is expensive. A 5-year buffer lowers ruin from 1.21% to 0.81%, while target shortfall rises from 24.73% to 33.86% and median ending wealth falls from 3.32x to 1.81x. That is why the rest of the report uses zero cash buffer as the baseline.
+**Conclusion:** T-bill cash still does what cash is supposed to do: it slightly lowers ruin and floor-breach risk. But it remains expensive. A 5-year buffer lowers ruin from 1.21% to 0.74%, while target shortfall rises from 24.73% to 32.68% and median ending wealth falls from 3.32x to 1.92x. That is why the rest of the report uses zero cash buffer as the baseline.
 
 ## Experiment 2: Historical Window Sensitivity
 
@@ -363,7 +363,7 @@ This is a model result, not personalized financial advice. Important limitations
 - Fees are ignored.
 - Returns are annual, not monthly.
 - Inflation is annual CPI-U, not monthly household-specific inflation.
-- Cash earns the sampled inflation rate, so it has 0% real return.
+- Cash earns historical T-bill returns sampled from the same calendar years as stocks, bonds, and inflation.
 - Bonds are 10-year Treasury annual total returns, not a live bond fund.
 - Spending behavior is mechanical.
 - The bootstrap assumes historical blocks are a reasonable proxy for future regimes.

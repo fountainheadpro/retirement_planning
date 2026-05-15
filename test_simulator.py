@@ -417,8 +417,36 @@ class TestRunSimulation:
         assert results["portfolio_values"][1, 0] == pytest.approx(1_000_000)
         assert results["inflation_rates"][0, 0] == pytest.approx(0.10)
 
-    def test_cash_can_match_sampled_inflation(self):
-        """A None cash rate should make cash earn the sampled inflation rate."""
+    def test_cash_uses_sampled_tbill_returns_when_available(self):
+        """A None cash rate should make cash use sampled T-bill returns when supplied."""
+
+        class TBillMarket:
+            def simulate_matrix(self, years, n_paths):
+                return {
+                    "stock": np.zeros((years, n_paths)),
+                    "inflation": np.full((years, n_paths), 0.02),
+                    "cash": np.full((years, n_paths), 0.04),
+                }
+
+        results = run_simulation(
+            initial_net_worth=1_000_000,
+            annual_spend=100_000,
+            buffer_years=1,
+            years=1,
+            panic_threshold=-0.15,
+            inflation_rate=0.03,
+            n_paths=1,
+            market_model=TBillMarket(),
+            spending_cap_pct=0.0,
+            cash_interest_rate=None,
+        )
+
+        expected_cash = 100_000 * (1.04 / 1.02)
+        assert results["cash_values"][1, 0] == pytest.approx(expected_cash)
+        assert results["cash_returns"][0, 0] == pytest.approx(0.04)
+
+    def test_cash_can_match_sampled_inflation_without_tbill_returns(self):
+        """A None cash rate should fall back to inflation matching when cash returns are absent."""
 
         class InflationMarket:
             def simulate_matrix(self, years, n_paths):
@@ -443,15 +471,15 @@ class TestRunSimulation:
         assert results["cash_values"][1, 0] == pytest.approx(results["cash_values"][0, 0])
 
 
-class TestPairedBlockBootstrapMarket:
-    """Test paired stock/bond return sampling."""
+class TestBlockBootstrapMarket:
+    """Test stock/cash/inflation block sampling."""
 
-    def test_preserves_stock_bond_inflation_year_pairings(self):
-        """Sampled stock, bond, and inflation returns should come from the same historical year."""
-        model = PairedBlockBootstrapMarket(
-            stock_returns=np.array([0.10, 0.20, 0.30]),
-            bond_returns=np.array([0.01, 0.02, 0.03]),
+    def test_preserves_stock_cash_inflation_year_pairings(self):
+        """Sampled stock, cash, and inflation returns should come from the same historical year."""
+        model = BlockBootstrapMarket(
+            history_returns=np.array([0.10, 0.20, 0.30]),
             inflation_rates=np.array([0.04, 0.05, 0.06]),
+            cash_returns=np.array([0.01, 0.02, 0.03]),
             block_size=1,
         )
 
@@ -460,7 +488,7 @@ class TestPairedBlockBootstrapMarket:
         observed_pairs = set(
             zip(
                 matrices["stock"].ravel(),
-                matrices["bond"].ravel(),
+                matrices["cash"].ravel(),
                 matrices["inflation"].ravel(),
             )
         )
@@ -471,6 +499,37 @@ class TestPairedBlockBootstrapMarket:
             (0.30, 0.03, 0.06),
         }
 
+
+class TestPairedBlockBootstrapMarket:
+    """Test paired stock/bond return sampling."""
+
+    def test_preserves_stock_bond_cash_inflation_year_pairings(self):
+        """Sampled stock, bond, cash, and inflation returns should come from the same historical year."""
+        model = PairedBlockBootstrapMarket(
+            stock_returns=np.array([0.10, 0.20, 0.30]),
+            bond_returns=np.array([0.01, 0.02, 0.03]),
+            inflation_rates=np.array([0.04, 0.05, 0.06]),
+            cash_returns=np.array([0.001, 0.002, 0.003]),
+            block_size=1,
+        )
+
+        np.random.seed(7)
+        matrices = model.simulate_matrix(years=8, n_paths=4)
+        observed_pairs = set(
+            zip(
+                matrices["stock"].ravel(),
+                matrices["bond"].ravel(),
+                matrices["cash"].ravel(),
+                matrices["inflation"].ravel(),
+            )
+        )
+
+        assert observed_pairs <= {
+            (0.10, 0.01, 0.001, 0.04),
+            (0.20, 0.02, 0.002, 0.05),
+            (0.30, 0.03, 0.003, 0.06),
+        }
+
     def test_stock_bond_loader_returns_requested_history(self):
         """Loader should return the latest paired stock, bond, and inflation history."""
         data = get_stock_bond_data(history_years=75)
@@ -479,6 +538,7 @@ class TestPairedBlockBootstrapMarket:
         assert len(data["stock_returns"]) == 75
         assert len(data["bond_returns"]) == 75
         assert len(data["inflation_rates"]) == 75
+        assert len(data["tbill_returns"]) == 75
         assert data["years"][-1] >= 2024
 
 

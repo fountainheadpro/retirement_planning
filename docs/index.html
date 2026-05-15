@@ -542,13 +542,13 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
 
           <h3>Model</h3>
           <p>The simulations use 20,000 Monte Carlo paths, annual returns, historical CPI inflation, and historical block bootstrap. The main lookback window is 1951-2025 from Aswath Damodaran’s annual return dataset, using the S&amp;P 500 total-return series with dividends reinvested.</p>
-          <p>Inflation comes from <a href="https://fred.stlouisfed.org/series/CPIAUCNS">FRED CPI-U</a>, calculated December-to-December. Stock, bond, and inflation records are joined by year and sampled from the same 5-year historical blocks. Cash is modeled as earning the sampled inflation rate, so cash has a 0% real return.</p>
+          <p>Inflation comes from <a href="https://fred.stlouisfed.org/series/CPIAUCNS">FRED CPI-U</a>, calculated December-to-December. Stock, bond, T-bill, and inflation records are joined by year and sampled from the same 5-year historical blocks. Cash buffers are modeled with the historical T-bill return from the sampled year.</p>
         </section>
 
         <section id="cash">
           <h2>Experiment 1: Cash Buffer</h2>
-          <p>This experiment varies the cash buffer from 0 to 5 years of target spending. A buffer is measured in years of the target withdrawal. For example, with a $5M portfolio and a 4% target, target spending is $200,000, so a 5-year cash buffer is $1M held in cash. Cash is modeled as earning the sampled inflation rate, which is equivalent to a 0% real return.</p>
-          <p>The remaining portfolio is invested in the Damodaran S&amp;P 500 total-return series, using the 75-year lookback window with aligned historical inflation.</p>
+          <p>This experiment varies the cash buffer from 0 to 5 years of target spending. A buffer is measured in years of the target withdrawal. For example, with a $5M portfolio and a 4% target, target spending is $200,000, so a 5-year cash buffer is $1M held in cash. Cash is modeled with historical T-bill returns sampled from the same years as stock returns and inflation.</p>
+          <p>The remaining portfolio is invested in the Damodaran S&amp;P 500 total-return series, using the 75-year lookback window with aligned historical T-bill returns and inflation.</p>
           <div class="table-wrap">
             <table>
               <thead>
@@ -556,10 +556,10 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
               </thead>
               <tbody>
                 <tr><td>0 years</td><td>1.21%</td><td>24.73%</td><td>0.20%</td><td>0.60x</td><td>3.32x</td></tr>
-                <tr><td>1 year</td><td>1.09%</td><td>25.44%</td><td>0.17%</td><td>0.58x</td><td>3.11x</td></tr>
-                <tr><td>2 years</td><td>1.00%</td><td>26.80%</td><td>0.14%</td><td>0.55x</td><td>2.82x</td></tr>
-                <tr><td>3 years</td><td>0.93%</td><td>28.65%</td><td>0.12%</td><td>0.51x</td><td>2.50x</td></tr>
-                <tr><td>5 years</td><td>0.81%</td><td>33.86%</td><td>0.08%</td><td>0.41x</td><td>1.81x</td></tr>
+                <tr><td>1 year</td><td>1.09%</td><td>25.25%</td><td>0.17%</td><td>0.59x</td><td>3.13x</td></tr>
+                <tr><td>2 years</td><td>1.00%</td><td>26.43%</td><td>0.14%</td><td>0.56x</td><td>2.87x</td></tr>
+                <tr><td>3 years</td><td>0.92%</td><td>28.00%</td><td>0.12%</td><td>0.53x</td><td>2.57x</td></tr>
+                <tr><td>5 years</td><td>0.74%</td><td>32.68%</td><td>0.08%</td><td>0.43x</td><td>1.92x</td></tr>
               </tbody>
             </table>
           </div>
@@ -567,7 +567,7 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
             <img src="assets/bond_report_cash_buffer.png" alt="Cash buffer tradeoff chart.">
             <figcaption>Cash reduces the already-small floor risk only slightly, while target shortfall rises and ending wealth falls.</figcaption>
           </figure>
-          <p class="callout"><b>Conclusion:</b> cash still does what cash is supposed to do: it slightly lowers ruin and floor-breach risk. But it is expensive. A 5-year buffer lowers ruin from 1.21% to 0.81%, while target shortfall rises from 24.73% to 33.86% and median ending wealth falls from 3.32x to 1.81x. That is why the rest of the report uses zero cash buffer as the baseline.</p>
+          <p class="callout"><b>Conclusion:</b> T-bill cash still does what cash is supposed to do: it slightly lowers ruin and floor-breach risk. But it remains expensive. A 5-year buffer lowers ruin from 1.21% to 0.74%, while target shortfall rises from 24.73% to 32.68% and median ending wealth falls from 3.32x to 1.92x. That is why the rest of the report uses zero cash buffer as the baseline.</p>
         </section>
 
         <section id="history">

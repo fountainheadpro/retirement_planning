@@ -80,6 +80,7 @@ def summarize(results: dict, target_spend: float, floor_spend: float) -> dict:
 def run_stock_simulation(
     stock_returns: np.ndarray,
     inflation_rates: np.ndarray,
+    cash_returns: np.ndarray,
     spending_cap_pct: float,
     buffer_years: int,
     block_size: int = BLOCK_SIZE,
@@ -89,6 +90,7 @@ def run_stock_simulation(
         stock_returns,
         block_size=block_size,
         inflation_rates=inflation_rates,
+        cash_returns=cash_returns,
     )
     np.random.seed(SEED)
     results = run_simulation(
@@ -123,6 +125,7 @@ def run_bond_simulation(
         stock_returns=asset_history["stock_returns"],
         bond_returns=asset_history["bond_returns"],
         inflation_rates=asset_history["inflation_rates"],
+        cash_returns=asset_history["tbill_returns"],
         block_size=BLOCK_SIZE,
     )
     np.random.seed(SEED)
@@ -149,6 +152,7 @@ def main() -> None:
     baseline_assets = get_stock_bond_data(history_years=75)
     stock_returns = baseline_assets["stock_returns"]
     inflation_rates = baseline_assets["inflation_rates"]
+    cash_returns = baseline_assets["tbill_returns"]
 
     safe_withdrawal_rows = []
     for spending_cap_pct in [pct / 100 for pct in range(4, 11)]:
@@ -162,6 +166,7 @@ def main() -> None:
             run_stock_simulation(
                 stock_returns,
                 inflation_rates,
+                cash_returns,
                 spending_cap_pct,
                 buffer_years=0,
             )
@@ -175,6 +180,7 @@ def main() -> None:
             run_stock_simulation(
                 stock_returns,
                 inflation_rates,
+                cash_returns,
                 BASELINE_SPENDING_CAP_PCT,
                 buffer_years,
             )
@@ -193,6 +199,7 @@ def main() -> None:
             run_stock_simulation(
                 asset_history["stock_returns"],
                 asset_history["inflation_rates"],
+                asset_history["tbill_returns"],
                 BASELINE_SPENDING_CAP_PCT,
                 buffer_years=0,
             )
@@ -206,6 +213,7 @@ def main() -> None:
             run_stock_simulation(
                 stock_returns,
                 inflation_rates,
+                cash_returns,
                 BASELINE_SPENDING_CAP_PCT,
                 buffer_years=0,
                 block_size=block_size,
@@ -257,7 +265,7 @@ def main() -> None:
             "panic_threshold": PANIC_THRESHOLD,
             "fallback_inflation_rate": FALLBACK_INFLATION_RATE,
             "cash_interest_rate": CASH_RATE,
-            "cash_return_source": "Cash return matches sampled inflation, so cash earns 0% real return.",
+            "cash_return_source": "Historical T-bill returns sampled from the same year/block as stocks, bonds, and inflation.",
             "n_paths": N_PATHS,
             "block_size_years": BLOCK_SIZE,
             "seed": SEED,
