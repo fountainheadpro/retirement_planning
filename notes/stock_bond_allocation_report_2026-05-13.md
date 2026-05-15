@@ -24,7 +24,7 @@ The setup is now expressed as a percentage rule, not as one hardcoded starting p
 - Spending cap during the simulation: **5% of the current portfolio value**.
 - Horizon: **30 years**.
 - Inflation: **historical CPI-U inflation**, sampled from the same calendar years as returns.
-- Cash return: **historical T-bill returns**, sampled from the same calendar years as stocks, bonds, and inflation.
+- Cash return: **historical T-bill returns**, sampled from the same calendar years as stocks, bonds, and inflation. Cash means a T-bill-like reserve, not an assumed 0% real inflation-matched asset.
 - Simulations: **20,000 Monte Carlo paths**.
 - Market model: **5-year historical block bootstrap**.
 - Return source: **Damodaran annual S&P 500 total returns with dividends reinvested, T-bill returns, and bond total returns**.
@@ -137,7 +137,7 @@ The chart assets are generated from `notes/assets/bond_report_results.json` by `
 
 ## Experiment 1: Cash Buffer
 
-This experiment varies the cash buffer from 0 to 5 years of target spending. A buffer is measured in years of the target withdrawal. For example, with a $5M portfolio and a 4% target, target spending is $200,000, so a 5-year cash buffer is $1M held in cash. Cash is modeled with historical T-bill returns sampled from the same years as stock returns and inflation.
+This experiment varies the cash buffer from 0 to 5 years of target spending. A buffer is measured in years of the target withdrawal. For example, with a $5M portfolio and a 4% target, target spending is $200,000, so a 5-year cash buffer is $1M held in a T-bill-like cash reserve. The reserve uses historical T-bill returns sampled from the same years as stock returns and inflation, so its real return can be positive or negative depending on the sampled year.
 
 The remaining portfolio is invested in the Damodaran S&P 500 total-return series, using the 75-year lookback window with aligned historical T-bill returns and inflation.
 
@@ -170,6 +170,8 @@ This experiment keeps the same 5% target and 2.5% floor, with no cash buffer, an
 The Depression-inclusive 98-year case is useful as a stress test, but it changes the modeled world. It is not just a longer sample; it pulls in a different economic regime.
 
 The 98-year window is much harsher because it includes the Great Depression. That may be useful as a stress test, but it is a different modeling choice from a modern-retirement baseline.
+
+The Depression-inclusive window is useful as a stress test, but a Great Depression-level scenario is not only a portfolio problem. If the planning objective is to survive a broad economic and social breakdown, the plan has to expand beyond asset allocation into resilience planning: liquidity, location, food, health care access, family support, home security, and practical contingency plans. A retirement spreadsheet can model asset returns and inflation; it cannot model institutional failure or social instability.
 
 The 75-year window keeps difficult nominal-return regimes: the 1970s, 2000-2002, 2008, 2022, and other modern drawdowns. It excludes the Depression-era return path because the goal here is to test a contemporary baseline, not the most severe possible historical regime.
 
@@ -284,6 +286,8 @@ This companion table is why the target-shortfall metric should not be read as a 
 
 The objective chart isolates the bond decision: each step toward more bonds moves down and to the right, toward lower median ending wealth and higher target shortfall.
 
+Ending wealth is not just inheritance or excess. It is longevity cushion. A 30-year simulation is a modeling horizon, not a known lifespan. If the retiree lives 35 or 40 years, the difference between ending with 3.32x and 1.41x is not cosmetic. It is the reserve that protects against extra years, late-life care, bad post-year-30 returns, family needs, and inflation surprises.
+
 **Conclusion:** bonds reduce ruin and floor-breach risk, but they do not improve the target/floor objective. At 4%, stock-only already has a 0.23% ruin rate; 60/40 cuts that to 0.01%, but target shortfall rises from 19.40% to 26.01% and median ending wealth falls from 4.27x to 2.06x. At 5%, the same tradeoff appears at a higher spending level: 60/40 cuts ruin from 1.21% to 0.31%, while target shortfall rises and median wealth falls sharply.
 
 ## Interpretation
@@ -309,7 +313,7 @@ Terminology matters:
 
 This report tests 0%, 10%, 20%, 40%, and 60% bond allocations. The 40% bond case is the traditional 60/40 portfolio. The strongest evidence is against the 60% bond case, but the 40% bond case is also worse than 0% bonds on target shortfall and median wealth in this model.
 
-The conclusion is sharper than the prior version of this report: for this flexible-spending retiree, the generic 60/40 plus 4% recommendation breaks. It protects against an already-small ruin risk while giving up too much target lifestyle reliability and compounding.
+The conclusion is sharper than the prior version of this report: the generic permanent 60/40 plus 4% recommendation breaks under this flexible-spending objective. It protects against an already-small ruin risk while giving up too much target lifestyle reliability, compounding, and longevity cushion.
 
 The defensible conclusion is still narrower than "bonds are bad." Under this flexible spending rule, large permanent cash and bond allocations did not improve the chosen objective. They mainly traded a small reduction in already-low ruin/floor risk for more target shortfall and lower long-term wealth.
 
@@ -361,7 +365,7 @@ For a retiree who can downshift spending from 5% of initial wealth to a 2.5% flo
 
 The sharper conclusion is:
 
-> For this flexible-spending retiree, the generic 60/40 plus 4% recommendation breaks: it protects against an already-small ruin risk while giving up too much target lifestyle reliability and compounding.
+> The generic permanent 60/40 plus 4% recommendation breaks under this flexible-spending objective: it protects against an already-small ruin risk while giving up too much target lifestyle reliability, compounding, and longevity cushion.
 
 ## Practical Takeaways
 
