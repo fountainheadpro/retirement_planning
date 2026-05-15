@@ -363,9 +363,9 @@ The remaining defensible cases for bonds are narrow: explicit short-term liabili
 
 For a retiree who can downshift spending from 5% of initial wealth to a 2.5% floor, the high-bond portfolio is protecting against an already-small risk while making the preferred lifestyle less likely.
 
-The sharper conclusion is:
+The sharper conclusion is that the generic permanent 60/40 plus 4% recommendation breaks under this flexible-spending objective. The report's larger contribution is replacing abstract labels like "conservative" and "aggressive" with a quantified risk-versus-quality-of-life tradeoff. A retiree can see the actual odds of ruin, the odds and depth of target shortfall, the chance of breaching the spending floor, and the size of the longevity cushion left at year 30.
 
-> The generic permanent 60/40 plus 4% recommendation breaks under this flexible-spending objective: it protects against an already-small ruin risk while giving up too much target lifestyle reliability, compounding, and longevity cushion.
+A portfolio is only conservative if it conserves what the retiree actually values. In this model, a generic permanent 60/40 allocation buys a small reduction in already-low ruin risk by accepting more years below the desired lifestyle and a smaller reserve for long life, late-life care, family needs, bad late returns, and inflation surprises. That is not automatically safer. It is a different quality-of-life choice with measurable costs.
 
 ## Practical Takeaways
 
