@@ -133,10 +133,10 @@
     </header>
 
     <div class="metric-strip">
-      <div class="metric"><strong>23.50%</strong><span>target-shortfall path-months for sell-only stock exposure</span></div>
-      <div class="metric"><strong>13.62%</strong><span>best credit-line target-shortfall result in the trigger search</span></div>
-      <div class="metric"><strong>4.06x</strong><span>real median ending net wealth for sell-only stock exposure</span></div>
-      <div class="metric"><strong>4.13x</strong><span>best credit-line median ending net wealth in the trigger search</span></div>
+      <div class="metric"><strong>23.50%</strong><span>target-shortfall path-months for 5% sell-only stock exposure</span></div>
+      <div class="metric"><strong>13.62%</strong><span>best 5% credit-line target-shortfall result</span></div>
+      <div class="metric"><strong>18.47%</strong><span>target-shortfall path-months for 4% sell-only stock exposure</span></div>
+      <div class="metric"><strong>8.85%</strong><span>best 4% credit-line target-shortfall result</span></div>
     </div>
 
     <div class="layout">
@@ -176,15 +176,15 @@
               <ul>
                 <li>20,000 random 30-year paths.</li>
                 <li>5-year monthly blocks sampled with replacement.</li>
-                <li>5% target spending and 2.5% floor, both real.</li>
+                <li>Two spending paths: 5% target / 2.5% floor and 4% target / 2% floor, all real.</li>
                 <li>Credit cost: CPI + 2%, modeled as 2% real.</li>
                 <li>Maximum loan-to-value: 25% of portfolio assets.</li>
               </ul>
             </div>
           </div>
-          <pre class="formula">target = 5.0% of initial portfolio / 12 each month
-floor = 2.5% of initial portfolio / 12 each month
-cap = 5.0% / 12 of current real net wealth
+          <pre class="formula">target = 5.0% or 4.0% of initial portfolio / 12 each month
+floor = 50% of target spending
+cap = target rate / 12 of current real net wealth
 
 normal spending = min(net wealth, max(floor, min(target, cap)))
 
@@ -199,7 +199,9 @@ if drawdown trigger is active:
 
         <section id="results">
           <h2>Results</h2>
-          <p>The table compares the sell-only baseline against credit lines triggered at 10%, 20%, 30%, and 40% drawdowns from the S&amp;P 500 Total Return high-water mark.</p>
+          <p>The tables compare the sell-only baseline against credit lines triggered at 10%, 20%, 30%, and 40% drawdowns from the S&amp;P 500 Total Return high-water mark. The 4% path is the same strategy with lower spending pressure.</p>
+          
+          <h3>5% target / 2.5% floor</h3>
           <div class="table-wrap">
             <table>
               <thead>
@@ -211,6 +213,22 @@ if drawdown trigger is active:
 <tr><td>20% trigger</td><td>20%</td><td>2.72%</td><td>14.98%</td><td>0.53%</td><td>0.54x</td><td>4.12x</td><td>97.50%</td><td>28.10%</td></tr>
 <tr><td>30% trigger</td><td>30%</td><td>2.54%</td><td>15.91%</td><td>0.50%</td><td>0.56x</td><td>4.10x</td><td>88.83%</td><td>25.35%</td></tr>
 <tr><td>40% trigger</td><td>40%</td><td>2.32%</td><td>16.99%</td><td>0.44%</td><td>0.59x</td><td>4.09x</td><td>81.69%</td><td>20.89%</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>4% target / 2% floor</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Strategy</th><th>Trigger</th><th>Ruin</th><th>Target shortfall</th><th>Floor breach</th><th>Real final p10</th><th>Real final median</th><th>Ever used credit</th><th>Margin event</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Sell only</td><td>n/a</td><td>0.11%</td><td>18.47%</td><td>0.01%</td><td>1.07x</td><td>5.14x</td><td>0.00%</td><td>0.00%</td></tr>
+<tr><td>10% trigger</td><td>10%</td><td>1.07%</td><td>8.85%</td><td>0.17%</td><td>0.89x</td><td>5.21x</td><td>100.00%</td><td>19.91%</td></tr>
+<tr><td>20% trigger</td><td>20%</td><td>0.92%</td><td>10.08%</td><td>0.14%</td><td>0.92x</td><td>5.20x</td><td>97.50%</td><td>17.44%</td></tr>
+<tr><td>30% trigger</td><td>30%</td><td>0.84%</td><td>10.93%</td><td>0.13%</td><td>0.94x</td><td>5.20x</td><td>88.83%</td><td>15.37%</td></tr>
+<tr><td>40% trigger</td><td>40%</td><td>0.71%</td><td>12.01%</td><td>0.11%</td><td>0.96x</td><td>5.19x</td><td>81.69%</td><td>12.67%</td></tr>
               </tbody>
             </table>
           </div>
@@ -227,6 +245,8 @@ if drawdown trigger is active:
         <section id="debt">
           <h2>Debt Risk</h2>
           <p>Borrowing improves lifestyle only when the line is actually used. But more use also means more months with debt outstanding and more exposure to collateral limits.</p>
+          
+          <h3>5% target / 2.5% floor</h3>
           <div class="table-wrap">
             <table>
               <thead>
@@ -237,6 +257,21 @@ if drawdown trigger is active:
 <tr><td>20% trigger</td><td>97.50%</td><td>93</td><td>37.85%</td><td>84.91%</td><td>30.3%</td><td>4.53%</td></tr>
 <tr><td>30% trigger</td><td>88.83%</td><td>80</td><td>36.12%</td><td>85.45%</td><td>29.2%</td><td>4.65%</td></tr>
 <tr><td>40% trigger</td><td>81.69%</td><td>66</td><td>33.24%</td><td>86.54%</td><td>28.3%</td><td>4.81%</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>4% target / 2% floor</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Strategy</th><th>Ever used credit</th><th>Median debt months if used</th><th>95th pct peak debt</th><th>Ever miss target</th><th>Avg shortfall gap</th><th>Integrated target loss</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>10% trigger</td><td>100.00%</td><td>123</td><td>35.82%</td><td>75.79%</td><td>27.6%</td><td>2.44%</td></tr>
+<tr><td>20% trigger</td><td>97.50%</td><td>93</td><td>34.26%</td><td>82.05%</td><td>25.5%</td><td>2.57%</td></tr>
+<tr><td>30% trigger</td><td>88.83%</td><td>80</td><td>32.93%</td><td>82.60%</td><td>24.7%</td><td>2.70%</td></tr>
+<tr><td>40% trigger</td><td>81.69%</td><td>66</td><td>30.56%</td><td>83.83%</td><td>24.1%</td><td>2.90%</td></tr>
               </tbody>
             </table>
           </div>

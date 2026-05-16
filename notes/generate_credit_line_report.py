@@ -25,7 +25,7 @@ MONTHS = YEARS * 12
 N_PATHS = 20_000
 BLOCK_MONTHS = 60
 SEED = 20260516
-TARGET_RATE = 0.05
+TARGET_RATES = [0.05, 0.04]
 FLOOR_RATIO = 0.5
 REAL_CREDIT_SPREAD = 0.02
 MAX_LTV = 0.25
@@ -127,16 +127,23 @@ def sample_monthly_paths(history: MonthlyHistory) -> dict[str, np.ndarray]:
     }
 
 
-def spending_amount(wealth: np.ndarray) -> np.ndarray:
+def scenario_label(target_rate: float) -> str:
+    """Human-readable target/floor scenario label."""
+    target = f"{target_rate * 100:g}%"
+    floor = f"{target_rate * FLOOR_RATIO * 100:g}%"
+    return f"{target} target / {floor} floor"
+
+
+def spending_amount(wealth: np.ndarray, target_rate: float) -> np.ndarray:
     """Monthly target/cap/floor spending rule in real dollars."""
-    target_monthly = TARGET_RATE / 12.0 * BASE
+    target_monthly = target_rate / 12.0 * BASE
     floor_monthly = target_monthly * FLOOR_RATIO
-    cap = TARGET_RATE / 12.0 * np.maximum(wealth, 0.0)
+    cap = target_rate / 12.0 * np.maximum(wealth, 0.0)
     desired = np.maximum(np.minimum(target_monthly, cap), floor_monthly)
     return np.minimum(desired, np.maximum(wealth, 0.0))
 
 
-def run_sell_baseline(paths: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
+def run_sell_baseline(paths: dict[str, np.ndarray], target_rate: float) -> dict[str, np.ndarray]:
     """Run stock-only flexible spending with no borrowing."""
     assets = np.full(N_PATHS, BASE, dtype=float)
     spending = np.zeros((MONTHS, N_PATHS), dtype=np.float32)
@@ -148,7 +155,7 @@ def run_sell_baseline(paths: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
         assets[alive] *= 1.0 + paths["stock_real"][month, alive]
         assets = np.maximum(assets, 0.0)
 
-        withdrawal = spending_amount(assets)
+        withdrawal = spending_amount(assets, target_rate)
         assets -= withdrawal
         assets = np.maximum(assets, 0.0)
         spending[month, :] = withdrawal
@@ -164,7 +171,11 @@ def run_sell_baseline(paths: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
     }
 
 
-def run_credit_line(paths: dict[str, np.ndarray], trigger: float) -> dict[str, np.ndarray]:
+def run_credit_line(
+    paths: dict[str, np.ndarray],
+    trigger: float,
+    target_rate: float,
+) -> dict[str, np.ndarray]:
     """Run target-preserving credit-line strategy through drawdown cycles."""
     assets = np.full(N_PATHS, BASE, dtype=float)
     debt = np.zeros(N_PATHS, dtype=float)
@@ -181,7 +192,7 @@ def run_credit_line(paths: dict[str, np.ndarray], trigger: float) -> dict[str, n
     margin_event = np.zeros((MONTHS, N_PATHS), dtype=bool)
 
     real_credit_rate = (1.0 + REAL_CREDIT_SPREAD) ** (1.0 / 12.0) - 1.0
-    target_monthly = TARGET_RATE / 12.0 * BASE
+    target_monthly = target_rate / 12.0 * BASE
 
     net_values[0, :] = assets
     asset_values[0, :] = assets
@@ -218,7 +229,7 @@ def run_credit_line(paths: dict[str, np.ndarray], trigger: float) -> dict[str, n
             in_credit_cycle[recovered] = False
 
         in_credit_cycle &= assets > 0.0
-        normal_desired = spending_amount(np.maximum(assets - debt, 0.0))
+        normal_desired = spending_amount(np.maximum(assets - debt, 0.0), target_rate)
         capacity = np.maximum(MAX_LTV * assets - debt, 0.0)
         can_borrow = in_credit_cycle & (capacity > 0.0) & (assets > debt)
 
@@ -254,7 +265,7 @@ def run_credit_line(paths: dict[str, np.ndarray], trigger: float) -> dict[str, n
     }
 
 
-def summarize(label: str, simulation: dict[str, np.ndarray]) -> dict:
+def summarize(label: str, simulation: dict[str, np.ndarray], target_rate: float) -> dict:
     """Summarize monthly path outcomes in report-ready metrics."""
     spending = simulation["spending"]
     net_values = simulation["net_values"]
@@ -262,7 +273,7 @@ def summarize(label: str, simulation: dict[str, np.ndarray]) -> dict:
     credit_used = simulation["credit_used"]
     margin_event = simulation["margin_event"]
 
-    target_monthly = TARGET_RATE / 12.0 * BASE
+    target_monthly = target_rate / 12.0 * BASE
     floor_monthly = target_monthly * FLOOR_RATIO
     final = net_values[-1, :]
     target_shortfall = spending < target_monthly - 1e-8
@@ -283,6 +294,9 @@ def summarize(label: str, simulation: dict[str, np.ndarray]) -> dict:
 
     return {
         "label": label,
+        "scenario": scenario_label(target_rate),
+        "target_rate": target_rate,
+        "floor_rate": target_rate * FLOOR_RATIO,
         "ruin_pct": float(np.mean(ruin_path) * 100),
         "ruin_count": int(np.sum(ruin_path)),
         "target_shortfall_pct": float(np.mean(target_shortfall) * 100),
@@ -304,6 +318,22 @@ def summarize(label: str, simulation: dict[str, np.ndarray]) -> dict:
         "peak_debt_p95_pct_initial": float(np.percentile(np.max(debt, axis=0), 95) * 100),
         "margin_event_pct": float(np.mean(np.any(margin_event, axis=0)) * 100),
     }
+
+
+def run_strategy_rows(paths: dict[str, np.ndarray], target_rate: float) -> list[dict]:
+    """Run sell-only and credit-line trigger rows for one spending target."""
+    rows: list[dict] = []
+    baseline = summarize("Sell only", run_sell_baseline(paths, target_rate), target_rate)
+    baseline["trigger_pct"] = None
+    rows.append(baseline)
+
+    for trigger in TRIGGERS:
+        label = f"{trigger:.0%} trigger"
+        row = summarize(label, run_credit_line(paths, trigger, target_rate), target_rate)
+        row["trigger_pct"] = trigger * 100
+        rows.append(row)
+
+    return rows
 
 
 def setup_style() -> None:
@@ -423,10 +453,8 @@ def plot_mechanics() -> None:
     save(fig, "credit_line_mechanics.png")
 
 
-def plot_tradeoff(rows: list[dict]) -> None:
-    baseline = rows[0]
-    credit_rows = rows[1:]
-    xs = np.array([row["trigger_pct"] for row in credit_rows])
+def plot_tradeoff(scenarios: list[dict]) -> None:
+    colors = [COLORS["target"], COLORS["floor"]]
 
     fig, (ax1, ax2, ax3) = plt.subplots(
         3,
@@ -438,36 +466,110 @@ def plot_tradeoff(rows: list[dict]) -> None:
     title_block(
         fig,
         "Credit-Line Trigger Search",
-        "5% target / 2.5% floor, monthly S&P 500 Total Return blocks, CPI + 2% credit cost, 25% max LTV.",
+        "5% and 4% target spending, monthly S&P 500 Total Return blocks, CPI + 2% credit cost, 25% max LTV.",
     )
 
-    ax1.axhline(baseline["target_shortfall_pct"], color=COLORS["target"], linestyle=":", linewidth=1.8)
-    ax1.plot(xs, [r["target_shortfall_pct"] for r in credit_rows], marker="o", color=COLORS["target"], linewidth=2.8)
-    ax1.text(xs[0] - 0.5, baseline["target_shortfall_pct"] + 0.15, "sell-only baseline", color=COLORS["target"], fontsize=9.2)
+    for idx, scenario in enumerate(scenarios):
+        rows = scenario["rows"]
+        baseline = rows[0]
+        credit_rows = rows[1:]
+        xs = np.array([row["trigger_pct"] for row in credit_rows])
+        color = colors[idx % len(colors)]
+
+        ax1.axhline(
+            baseline["target_shortfall_pct"],
+            color=color,
+            linestyle=":",
+            linewidth=1.6,
+            alpha=0.7,
+        )
+        ax1.plot(
+            xs,
+            [r["target_shortfall_pct"] for r in credit_rows],
+            marker="o",
+            color=color,
+            linewidth=2.6,
+            label=f"{scenario['label']} credit",
+        )
+        ax1.text(
+            xs[0] - 0.5,
+            baseline["target_shortfall_pct"] + 0.15,
+            f"{scenario['target_rate']:.0%} sell-only",
+            color=color,
+            fontsize=8.9,
+        )
     ax1.set_ylabel("Target shortfall\npath-months (%)")
+    ax1.legend(frameon=False, ncol=2, loc="upper right")
     style_axis(ax1)
 
-    ax2.axhline(baseline["ruin_pct"], color=COLORS["ruin"], linestyle=":", linewidth=1.7)
-    ax2.plot(xs, [r["ruin_pct"] for r in credit_rows], marker="o", color=COLORS["ruin"], linewidth=2.4, label="Ruin")
-    ax2.plot(xs, [r["margin_event_pct"] for r in credit_rows], marker="s", color=COLORS["accent"], linewidth=2.4, label="Margin event")
+    for idx, scenario in enumerate(scenarios):
+        rows = scenario["rows"]
+        credit_rows = rows[1:]
+        xs = np.array([row["trigger_pct"] for row in credit_rows])
+        color = colors[idx % len(colors)]
+        ax2.plot(
+            xs,
+            [r["ruin_pct"] for r in credit_rows],
+            marker="o",
+            color=color,
+            linewidth=2.3,
+            label=f"{scenario['target_rate']:.0%} ruin",
+        )
+        ax2.plot(
+            xs,
+            [r["margin_event_pct"] for r in credit_rows],
+            marker="s",
+            color=color,
+            linestyle="--",
+            linewidth=2.0,
+            alpha=0.72,
+            label=f"{scenario['target_rate']:.0%} margin",
+        )
     ax2.set_ylabel("Path risk (%)")
     ax2.legend(frameon=False, ncol=2, loc="upper right")
     style_axis(ax2)
 
-    ax3.axhline(baseline["final_median_multiple"], color=COLORS["wealth"], linestyle=":", linewidth=1.8)
-    ax3.bar(xs, [r["final_p10_multiple"] for r in credit_rows], width=4.8, color=COLORS["wealth_light"], label="10th percentile")
-    ax3.plot(xs, [r["final_median_multiple"] for r in credit_rows], marker="s", color=COLORS["wealth"], linewidth=2.6, label="median")
+    for idx, scenario in enumerate(scenarios):
+        rows = scenario["rows"]
+        baseline = rows[0]
+        credit_rows = rows[1:]
+        xs = np.array([row["trigger_pct"] for row in credit_rows])
+        color = colors[idx % len(colors)]
+        ax3.axhline(
+            baseline["final_p10_multiple"],
+            color=color,
+            linestyle=":",
+            linewidth=1.5,
+            alpha=0.65,
+        )
+        ax3.plot(
+            xs,
+            [r["final_p10_multiple"] for r in credit_rows],
+            marker="o",
+            color=color,
+            linestyle="--",
+            linewidth=2.0,
+            label=f"{scenario['target_rate']:.0%} p10",
+        )
+        ax3.plot(
+            xs,
+            [r["final_median_multiple"] for r in credit_rows],
+            marker="s",
+            color=color,
+            linewidth=2.5,
+            label=f"{scenario['target_rate']:.0%} median",
+        )
     ax3.set_ylabel("Real ending\nnet wealth (x)")
     ax3.set_xlabel("Drawdown trigger for credit use")
     ax3.set_xticks(xs, [f"{x:.0f}%" for x in xs])
-    ax3.legend(frameon=False, loc="upper right")
+    ax3.legend(frameon=False, ncol=2, loc="upper right")
     style_axis(ax3)
 
     fig.subplots_adjust(top=0.84, left=0.1, right=0.9, bottom=0.1)
     save(fig, "credit_line_trigger_search.png")
 
 
-def plot_objective(rows: list[dict]) -> None:
+def plot_objective(scenarios: list[dict]) -> None:
     fig, ax = plt.subplots(figsize=(9.8, 6.4))
     title_block(
         fig,
@@ -475,33 +577,43 @@ def plot_objective(rows: list[dict]) -> None:
         "Borrowing buys fewer shortfall months by accepting worse downside wealth and collateral risk.",
     )
 
-    x = [row["target_shortfall_pct"] for row in rows]
-    y = [row["final_p10_multiple"] for row in rows]
-    c = [COLORS["wealth"]] + [COLORS["accent"]] * (len(rows) - 1)
-    sizes = [135] + [105 + row["margin_event_pct"] * 8 for row in rows[1:]]
-    ax.plot(x, y, color="#c9ced6", linewidth=2.0, zorder=1)
-    ax.scatter(x, y, s=sizes, color=c, edgecolor="white", linewidth=1.6, zorder=3)
-
-    label_offsets = {
-        "Sell only": (10, -6),
-        "10% trigger": (8, 8),
-        "20% trigger": (8, -8),
-        "30% trigger": (8, 4),
-        "40% trigger": (8, 6),
-    }
-    for row in rows:
-        label = row["label"]
-        ax.annotate(
-            label,
-            xy=(row["target_shortfall_pct"], row["final_p10_multiple"]),
-            xytext=label_offsets.get(label, (8, 5)),
-            textcoords="offset points",
-            fontsize=8.8,
-            color=COLORS["ink"],
-            fontweight="bold" if row["label"] in ["Sell only", "20% trigger"] else "normal",
-            bbox={"facecolor": COLORS["paper"], "edgecolor": "none", "alpha": 0.78, "pad": 1.8},
-            zorder=6,
+    colors = [COLORS["target"], COLORS["floor"]]
+    markers = ["o", "s"]
+    for idx, scenario in enumerate(scenarios):
+        rows = scenario["rows"]
+        color = colors[idx % len(colors)]
+        marker = markers[idx % len(markers)]
+        x = [row["target_shortfall_pct"] for row in rows]
+        y = [row["final_p10_multiple"] for row in rows]
+        sizes = [135] + [105 + row["margin_event_pct"] * 8 for row in rows[1:]]
+        ax.plot(x, y, color=color, linewidth=2.0, alpha=0.5, zorder=1)
+        ax.scatter(
+            x,
+            y,
+            s=sizes,
+            color=color,
+            marker=marker,
+            edgecolor="white",
+            linewidth=1.6,
+            label=scenario["label"],
+            zorder=3,
         )
+
+        for row in rows:
+            if row["label"] not in ["Sell only", "20% trigger", "40% trigger"]:
+                continue
+            label = f"{scenario['target_rate']:.0%} {row['label']}"
+            ax.annotate(
+                label,
+                xy=(row["target_shortfall_pct"], row["final_p10_multiple"]),
+                xytext=(8, 5),
+                textcoords="offset points",
+                fontsize=8.4,
+                color=COLORS["ink"],
+                fontweight="bold" if row["label"] == "Sell only" else "normal",
+                bbox={"facecolor": COLORS["paper"], "edgecolor": "none", "alpha": 0.78, "pad": 1.8},
+                zorder=6,
+            )
 
     ax.set_xlabel("Target shortfall (% of simulated path-months)")
     ax.set_ylabel("Real 10th percentile ending net wealth (x starting portfolio)")
@@ -513,6 +625,7 @@ def plot_objective(rows: list[dict]) -> None:
         color=COLORS["muted"],
         fontsize=9.2,
     )
+    ax.legend(frameon=False, loc="upper right")
     style_axis(ax, grid_axis="both")
     fig.subplots_adjust(top=0.82, left=0.1, right=0.96, bottom=0.13)
     save(fig, "credit_line_objective_tradeoff.png")
@@ -563,11 +676,56 @@ def debt_table(rows: list[dict]) -> str:
     return "\n".join(body)
 
 
+def scenario_result_sections(scenarios: list[dict]) -> str:
+    """Render result tables for each spending scenario."""
+    sections = []
+    for scenario in scenarios:
+        sections.append(
+            f"""
+          <h3>{scenario['label']}</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Strategy</th><th>Trigger</th><th>Ruin</th><th>Target shortfall</th><th>Floor breach</th><th>Real final p10</th><th>Real final median</th><th>Ever used credit</th><th>Margin event</th></tr>
+              </thead>
+              <tbody>
+                {result_table(scenario['rows'])}
+              </tbody>
+            </table>
+          </div>"""
+        )
+    return "\n".join(sections)
+
+
+def scenario_debt_sections(scenarios: list[dict]) -> str:
+    """Render debt-risk tables for each spending scenario."""
+    sections = []
+    for scenario in scenarios:
+        sections.append(
+            f"""
+          <h3>{scenario['label']}</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Strategy</th><th>Ever used credit</th><th>Median debt months if used</th><th>95th pct peak debt</th><th>Ever miss target</th><th>Avg shortfall gap</th><th>Integrated target loss</th></tr>
+              </thead>
+              <tbody>
+                {debt_table(scenario['rows'])}
+              </tbody>
+            </table>
+          </div>"""
+        )
+    return "\n".join(sections)
+
+
 def write_report(results: dict) -> None:
-    rows = results["rows"]
-    baseline = rows[0]
-    best_shortfall = min(rows[1:], key=lambda row: row["target_shortfall_pct"])
-    highest_wealth_credit = max(rows[1:], key=lambda row: row["final_median_multiple"])
+    scenarios = results["scenarios"]
+    primary_rows = scenarios[0]["rows"]
+    comparison_rows = scenarios[1]["rows"]
+    baseline = primary_rows[0]
+    comparison_baseline = comparison_rows[0]
+    best_shortfall = min(primary_rows[1:], key=lambda row: row["target_shortfall_pct"])
+    comparison_best_shortfall = min(comparison_rows[1:], key=lambda row: row["target_shortfall_pct"])
 
     html = f"""<!doctype html>
 <html lang="en">
@@ -704,10 +862,10 @@ def write_report(results: dict) -> None:
     </header>
 
     <div class="metric-strip">
-      <div class="metric"><strong>{pct(baseline['target_shortfall_pct'])}</strong><span>target-shortfall path-months for sell-only stock exposure</span></div>
-      <div class="metric"><strong>{pct(best_shortfall['target_shortfall_pct'])}</strong><span>best credit-line target-shortfall result in the trigger search</span></div>
-      <div class="metric"><strong>{multiple(baseline['final_median_multiple'])}</strong><span>real median ending net wealth for sell-only stock exposure</span></div>
-      <div class="metric"><strong>{multiple(highest_wealth_credit['final_median_multiple'])}</strong><span>best credit-line median ending net wealth in the trigger search</span></div>
+      <div class="metric"><strong>{pct(baseline['target_shortfall_pct'])}</strong><span>target-shortfall path-months for 5% sell-only stock exposure</span></div>
+      <div class="metric"><strong>{pct(best_shortfall['target_shortfall_pct'])}</strong><span>best 5% credit-line target-shortfall result</span></div>
+      <div class="metric"><strong>{pct(comparison_baseline['target_shortfall_pct'])}</strong><span>target-shortfall path-months for 4% sell-only stock exposure</span></div>
+      <div class="metric"><strong>{pct(comparison_best_shortfall['target_shortfall_pct'])}</strong><span>best 4% credit-line target-shortfall result</span></div>
     </div>
 
     <div class="layout">
@@ -747,15 +905,15 @@ def write_report(results: dict) -> None:
               <ul>
                 <li>{N_PATHS:,} random 30-year paths.</li>
                 <li>5-year monthly blocks sampled with replacement.</li>
-                <li>5% target spending and 2.5% floor, both real.</li>
+                <li>Two spending paths: 5% target / 2.5% floor and 4% target / 2% floor, all real.</li>
                 <li>Credit cost: CPI + 2%, modeled as 2% real.</li>
                 <li>Maximum loan-to-value: 25% of portfolio assets.</li>
               </ul>
             </div>
           </div>
-          <pre class="formula">target = 5.0% of initial portfolio / 12 each month
-floor = 2.5% of initial portfolio / 12 each month
-cap = 5.0% / 12 of current real net wealth
+          <pre class="formula">target = 5.0% or 4.0% of initial portfolio / 12 each month
+floor = 50% of target spending
+cap = target rate / 12 of current real net wealth
 
 normal spending = min(net wealth, max(floor, min(target, cap)))
 
@@ -770,17 +928,8 @@ if drawdown trigger is active:
 
         <section id="results">
           <h2>Results</h2>
-          <p>The table compares the sell-only baseline against credit lines triggered at 10%, 20%, 30%, and 40% drawdowns from the S&amp;P 500 Total Return high-water mark.</p>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr><th>Strategy</th><th>Trigger</th><th>Ruin</th><th>Target shortfall</th><th>Floor breach</th><th>Real final p10</th><th>Real final median</th><th>Ever used credit</th><th>Margin event</th></tr>
-              </thead>
-              <tbody>
-                {result_table(rows)}
-              </tbody>
-            </table>
-          </div>
+          <p>The tables compare the sell-only baseline against credit lines triggered at 10%, 20%, 30%, and 40% drawdowns from the S&amp;P 500 Total Return high-water mark. The 4% path is the same strategy with lower spending pressure.</p>
+          {scenario_result_sections(scenarios)}
           <figure class="figure">
             <img src="assets/credit_line_trigger_search.png" alt="Credit-line trigger search chart.">
             <figcaption>The dotted lines show the sell-only baseline. Credit-line triggers are only useful if their improvement in shortfall is worth the added debt and forced-sale risk.</figcaption>
@@ -794,16 +943,7 @@ if drawdown trigger is active:
         <section id="debt">
           <h2>Debt Risk</h2>
           <p>Borrowing improves lifestyle only when the line is actually used. But more use also means more months with debt outstanding and more exposure to collateral limits.</p>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr><th>Strategy</th><th>Ever used credit</th><th>Median debt months if used</th><th>95th pct peak debt</th><th>Ever miss target</th><th>Avg shortfall gap</th><th>Integrated target loss</th></tr>
-              </thead>
-              <tbody>
-                {debt_table(rows)}
-              </tbody>
-            </table>
-          </div>
+          {scenario_debt_sections(scenarios)}
           <p>The 95th percentile peak debt is shown as a percentage of the starting portfolio. With a $5M starting portfolio, 10% peak debt means a $500,000 real loan balance.</p>
         </section>
 
@@ -844,16 +984,15 @@ def main() -> None:
     history = fetch_monthly_history()
     paths = sample_monthly_paths(history)
 
-    rows: list[dict] = []
-    baseline = summarize("Sell only", run_sell_baseline(paths))
-    baseline["trigger_pct"] = None
-    rows.append(baseline)
-
-    for trigger in TRIGGERS:
-        label = f"{trigger:.0%} trigger"
-        row = summarize(label, run_credit_line(paths, trigger))
-        row["trigger_pct"] = trigger * 100
-        rows.append(row)
+    scenarios = [
+        {
+            "label": scenario_label(target_rate),
+            "target_rate": target_rate,
+            "floor_rate": target_rate * FLOOR_RATIO,
+            "rows": run_strategy_rows(paths, target_rate),
+        }
+        for target_rate in TARGET_RATES
+    ]
 
     results = {
         "settings": {
@@ -863,8 +1002,8 @@ def main() -> None:
             "n_paths": N_PATHS,
             "block_months": BLOCK_MONTHS,
             "seed": SEED,
-            "target_rate": TARGET_RATE,
-            "floor_rate": TARGET_RATE * FLOOR_RATIO,
+            "target_rates": TARGET_RATES,
+            "floor_rates": [target_rate * FLOOR_RATIO for target_rate in TARGET_RATES],
             "floor_ratio": FLOOR_RATIO,
             "real_credit_spread": REAL_CREDIT_SPREAD,
             "max_ltv": MAX_LTV,
@@ -874,13 +1013,14 @@ def main() -> None:
             "stock_source": "Yahoo/yfinance ^SP500TR, S&P 500 Total Return Index",
             "inflation_source": "FRED CPIAUCSL monthly CPI-U",
         },
-        "rows": rows,
+        "scenarios": scenarios,
+        "rows": scenarios[0]["rows"],
     }
 
     RESULTS_PATH.write_text(json.dumps(results, indent=2) + "\n")
     plot_mechanics()
-    plot_tradeoff(rows)
-    plot_objective(rows)
+    plot_tradeoff(scenarios)
+    plot_objective(scenarios)
     write_report(results)
 
 
