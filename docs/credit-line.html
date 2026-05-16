@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Can A Credit Line Replace Cash And Bonds?</title>
+  <meta name="description" content="A monthly S&P 500 total-return simulation testing an asset-backed credit line as a retirement drawdown buffer.">
+  <meta property="og:title" content="Can A Credit Line Replace Cash And Bonds?">
+  <meta property="og:description" content="A separate retirement report testing whether borrowing through drawdowns improves target spending without giving up too much real ending wealth.">
+  <meta property="og:type" content="article">
+  <meta property="og:image" content="assets/credit_line_objective_tradeoff.png">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,650;8..60,750&display=swap");
+    :root {
+      --paper: #fbfaf5;
+      --panel: #ffffff;
+      --ink: #16212c;
+      --muted: #697381;
+      --line: #d8dedf;
+      --red: #b23a48;
+      --green: #2f7d64;
+      --blue: #274c77;
+      --gold: #d2872c;
+      --radius: 6px;
+      --shadow: 0 24px 70px rgba(22, 33, 44, 0.12);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background:
+        linear-gradient(90deg, rgba(22, 33, 44, 0.035) 1px, transparent 1px) 0 0 / 44px 44px,
+        linear-gradient(180deg, #f4efe3 0%, var(--paper) 34%, #f4f0e6 100%);
+      color: var(--ink);
+      font-family: "IBM Plex Sans", ui-sans-serif, sans-serif;
+      line-height: 1.58;
+    }
+    a { color: var(--blue); text-underline-offset: 3px; }
+    .page { max-width: 1180px; margin: 0 auto; padding: 0 24px 72px; }
+    .hero {
+      min-height: 76vh;
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+      gap: 52px;
+      align-items: center;
+      padding: 56px 0 42px;
+    }
+    .eyebrow {
+      color: var(--red);
+      font-size: 0.76rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin: 0 0 18px;
+    }
+    h1, h2, h3 { font-family: "Source Serif 4", Georgia, serif; line-height: 1.03; letter-spacing: 0; margin: 0; }
+    h1 { font-size: clamp(3rem, 7vw, 6.8rem); max-width: 920px; }
+    h2 { font-size: clamp(2rem, 4vw, 4.2rem); margin-bottom: 20px; }
+    h3 { font-size: clamp(1.35rem, 2vw, 2.05rem); margin: 20px 0 10px; }
+    .dek { font-size: clamp(1.15rem, 2vw, 1.48rem); max-width: 760px; color: #33414f; margin: 24px 0 0; }
+    .hero-panel {
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(22, 33, 44, 0.12);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 22px;
+      backdrop-filter: blur(18px);
+    }
+    .hero-panel img, .figure img { width: 100%; display: block; border-radius: 4px; border: 1px solid var(--line); background: white; }
+    .caption, figcaption { color: var(--muted); font-size: 0.94rem; margin: 12px 0 0; }
+    .metric-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      margin: 20px 0 44px;
+      background: rgba(255, 255, 255, 0.55);
+    }
+    .metric { padding: 22px 18px; border-right: 1px solid var(--line); }
+    .metric:last-child { border-right: 0; }
+    .metric strong { display: block; font-family: "Source Serif 4", Georgia, serif; font-size: clamp(1.65rem, 3vw, 2.8rem); line-height: 1; margin-bottom: 8px; }
+    .metric span { color: var(--muted); font-size: 0.92rem; }
+    .layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 44px; align-items: start; }
+    nav { position: sticky; top: 18px; padding: 18px 0; border-top: 2px solid var(--ink); }
+    nav a { display: block; padding: 8px 0; color: #344250; text-decoration: none; font-size: 0.95rem; border-bottom: 1px solid rgba(22, 33, 44, 0.1); }
+    nav a:hover { color: var(--red); }
+    section { padding: 58px 0; border-top: 1px solid var(--line); }
+    section:first-child { border-top: 0; padding-top: 0; }
+    .lead { font-size: 1.17rem; color: #2e3c49; max-width: 860px; }
+    .callout { background: #fff8ea; border-left: 5px solid var(--gold); padding: 18px 20px; border-radius: var(--radius); margin: 24px 0; }
+    .formula { background: #16212c; color: #f7f3e9; border-radius: var(--radius); padding: 20px; overflow-x: auto; font: 500 0.96rem/1.7 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .figure { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 14px 40px rgba(22, 33, 44, 0.08); padding: 14px; margin: 28px 0; }
+    .grid-two { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin: 22px 0; }
+    .note-card { background: rgba(255, 255, 255, 0.72); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+    .table-wrap { overflow-x: auto; margin: 22px 0 30px; border: 1px solid var(--line); border-radius: var(--radius); background: white; }
+    table { width: 100%; border-collapse: collapse; min-width: 860px; font-size: 0.94rem; }
+    th, td { padding: 11px 13px; text-align: right; border-bottom: 1px solid #e9edee; white-space: nowrap; }
+    th:first-child, td:first-child { text-align: left; font-weight: 600; }
+    th { background: #f0f3ef; color: #32404d; font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; }
+    tr:last-child td { border-bottom: 0; }
+    blockquote { margin: 34px 0; padding: 4px 0 4px 24px; border-left: 5px solid var(--red); font-family: "Source Serif 4", Georgia, serif; font-size: clamp(1.35rem, 2.2vw, 2rem); line-height: 1.22; }
+    ul, ol { padding-left: 22px; }
+    li { margin: 7px 0; }
+    footer { color: var(--muted); border-top: 1px solid var(--line); padding-top: 28px; margin-top: 40px; font-size: 0.95rem; }
+    @media (max-width: 920px) {
+      .hero, .layout, .grid-two { grid-template-columns: 1fr; }
+      .hero { min-height: auto; }
+      nav { position: static; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 18px; }
+      .metric-strip { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 560px) {
+      .page { padding: 0 16px 48px; }
+      .metric-strip { grid-template-columns: 1fr; }
+      .metric { border-right: 0; border-bottom: 1px solid var(--line); }
+      .metric:last-child { border-bottom: 0; }
+      nav { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Retirement Planning Report · May 16, 2026</p>
+        <h1>Can A Credit Line Replace Cash And Bonds?</h1>
+        <p class="dek">A monthly S&amp;P 500 total-return simulation testing whether an asset-backed credit line can preserve lifestyle through drawdowns without giving up the compounding benefit of staying fully invested.</p>
+      </div>
+      <aside class="hero-panel">
+        <img src="assets/credit_line_objective_tradeoff.png" alt="Objective tradeoff chart for sell-only and credit-line strategies.">
+        <p class="caption">The credit-line question is not whether borrowing can reduce forced selling. It is whether the reduced selling is worth the debt cost, LTV risk, and repayment drag.</p>
+      </aside>
+    </header>
+
+    <div class="metric-strip">
+      <div class="metric"><strong>23.50%</strong><span>target-shortfall path-months for sell-only stock exposure</span></div>
+      <div class="metric"><strong>13.62%</strong><span>best credit-line target-shortfall result in the trigger search</span></div>
+      <div class="metric"><strong>4.06x</strong><span>real median ending net wealth for sell-only stock exposure</span></div>
+      <div class="metric"><strong>4.13x</strong><span>best credit-line median ending net wealth in the trigger search</span></div>
+    </div>
+
+    <div class="layout">
+      <nav>
+        <a href="#summary">Summary</a>
+        <a href="#setup">Setup</a>
+        <a href="#results">Results</a>
+        <a href="#debt">Debt Risk</a>
+        <a href="#interpretation">Interpretation</a>
+        <a href="#limits">Limitations</a>
+      </nav>
+      <main>
+        <section id="summary">
+          <h2>Executive Summary</h2>
+          <p class="lead">The credit-line strategy is a substitute for a cash buffer, not a free source of retirement income. It tries to solve one specific problem: do not sell equities after the market has already fallen.</p>
+          <p>The model keeps the retiree fully invested in the S&amp;P 500 Total Return index. When the index falls below a selected drawdown threshold, monthly target spending is borrowed against the portfolio at a real cost of 2% above inflation. When the index recovers to the pre-trigger high, the loan is repaid by selling shares.</p>
+          <p>This is the generous version of the credit-line idea: the line is used to protect target lifestyle spending, not just the minimum floor. That makes the upside visible, but it also exposes the full leverage tradeoff.</p>
+          <p>The result is mixed. The credit line can reduce target shortfall because it lets spending continue during drawdowns. But it introduces a new risk: debt and forced repayment. In the central version here, the loan is capped at 25% loan-to-value, and paths that breach that cap require forced selling.</p>
+          <blockquote>A credit line is not cash with a clever label. It is temporary leverage. It may be useful, but the model has to count interest, collateral limits, forced-sale risk, and the repayment drag after recovery.</blockquote>
+        </section>
+
+        <section id="setup">
+          <h2>Setup</h2>
+          <p>This report uses monthly data because credit-line triggers and paybacks are path-dependent. Annual data is too coarse for this specific question.</p>
+          <div class="grid-two">
+            <div class="note-card">
+              <h3>Data</h3>
+              <ul>
+                <li>S&amp;P 500 Total Return: Yahoo/yfinance <code>^SP500TR</code>.</li>
+                <li>Inflation: FRED monthly CPI-U, <code>CPIAUCSL</code>.</li>
+                <li>Aligned completed monthly window: Feb 1988 to Apr 2026.</li>
+                <li>458 paired monthly records.</li>
+              </ul>
+            </div>
+            <div class="note-card">
+              <h3>Simulation</h3>
+              <ul>
+                <li>20,000 random 30-year paths.</li>
+                <li>5-year monthly blocks sampled with replacement.</li>
+                <li>5% target spending and 2.5% floor, both real.</li>
+                <li>Credit cost: CPI + 2%, modeled as 2% real.</li>
+                <li>Maximum loan-to-value: 25% of portfolio assets.</li>
+              </ul>
+            </div>
+          </div>
+          <pre class="formula">target = 5.0% of initial portfolio / 12 each month
+floor = 2.5% of initial portfolio / 12 each month
+cap = 5.0% / 12 of current real net wealth
+
+normal spending = min(net wealth, max(floor, min(target, cap)))
+
+if drawdown trigger is active:
+    borrow target spending when collateral capacity is available
+    repay debt after the total-return index recovers to the pre-trigger high</pre>
+          <figure class="figure">
+            <img src="assets/credit_line_mechanics.png" alt="Credit-line mechanics diagram.">
+            <figcaption>The model treats borrowing as a temporary bridge, then explicitly repays the balance after recovery.</figcaption>
+          </figure>
+        </section>
+
+        <section id="results">
+          <h2>Results</h2>
+          <p>The table compares the sell-only baseline against credit lines triggered at 10%, 20%, 30%, and 40% drawdowns from the S&amp;P 500 Total Return high-water mark.</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Strategy</th><th>Trigger</th><th>Ruin</th><th>Target shortfall</th><th>Floor breach</th><th>Real final p10</th><th>Real final median</th><th>Ever used credit</th><th>Margin event</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Sell only</td><td>n/a</td><td>0.62%</td><td>23.50%</td><td>0.08%</td><td>0.74x</td><td>4.06x</td><td>0.00%</td><td>0.00%</td></tr>
+<tr><td>10% trigger</td><td>10%</td><td>3.17%</td><td>13.62%</td><td>0.62%</td><td>0.50x</td><td>4.13x</td><td>100.00%</td><td>32.16%</td></tr>
+<tr><td>20% trigger</td><td>20%</td><td>2.72%</td><td>14.98%</td><td>0.53%</td><td>0.54x</td><td>4.12x</td><td>97.50%</td><td>28.10%</td></tr>
+<tr><td>30% trigger</td><td>30%</td><td>2.54%</td><td>15.91%</td><td>0.50%</td><td>0.56x</td><td>4.10x</td><td>88.83%</td><td>25.35%</td></tr>
+<tr><td>40% trigger</td><td>40%</td><td>2.32%</td><td>16.99%</td><td>0.44%</td><td>0.59x</td><td>4.09x</td><td>81.69%</td><td>20.89%</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <figure class="figure">
+            <img src="assets/credit_line_trigger_search.png" alt="Credit-line trigger search chart.">
+            <figcaption>The dotted lines show the sell-only baseline. Credit-line triggers are only useful if their improvement in shortfall is worth the added debt and forced-sale risk.</figcaption>
+          </figure>
+          <figure class="figure">
+            <img src="assets/credit_line_objective_tradeoff.png" alt="Objective tradeoff chart.">
+            <figcaption>The objective is left-and-up: lower target shortfall and higher real ending net wealth.</figcaption>
+          </figure>
+        </section>
+
+        <section id="debt">
+          <h2>Debt Risk</h2>
+          <p>Borrowing improves lifestyle only when the line is actually used. But more use also means more months with debt outstanding and more exposure to collateral limits.</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Strategy</th><th>Ever used credit</th><th>Median debt months if used</th><th>95th pct peak debt</th><th>Ever miss target</th><th>Avg shortfall gap</th><th>Integrated target loss</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>10% trigger</td><td>100.00%</td><td>123</td><td>39.43%</td><td>79.42%</td><td>32.6%</td><td>4.44%</td></tr>
+<tr><td>20% trigger</td><td>97.50%</td><td>93</td><td>37.85%</td><td>84.91%</td><td>30.3%</td><td>4.53%</td></tr>
+<tr><td>30% trigger</td><td>88.83%</td><td>80</td><td>36.12%</td><td>85.45%</td><td>29.2%</td><td>4.65%</td></tr>
+<tr><td>40% trigger</td><td>81.69%</td><td>66</td><td>33.24%</td><td>86.54%</td><td>28.3%</td><td>4.81%</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>The 95th percentile peak debt is shown as a percentage of the starting portfolio. With a $5M starting portfolio, 10% peak debt means a $500,000 real loan balance.</p>
+        </section>
+
+        <section id="interpretation">
+          <h2>Interpretation</h2>
+          <p>The credit line is most attractive when it is used rarely, at moderate drawdowns, and repaid after a strong recovery. It is least attractive when markets continue falling after borrowing begins. That is exactly when an asset-backed lender can reduce available credit, raise collateral requirements, or force sales.</p>
+          <p>Compared with cash and bonds, the credit line preserves upside because the portfolio stays invested until a drawdown actually happens. That is the appealing part. The cost is that the bad case is more operationally fragile: the retiree now depends on lending terms, collateral capacity, and the ability to tolerate debt during the same market stress that caused the borrowing.</p>
+          <div class="callout"><b>Bottom line:</b> a securities-backed credit line can be a reasonable tactical liquidity tool, but it is not a clean replacement for cash or bonds. It improves some target-spending outcomes in this model only by introducing leverage and collateral risk. The right comparison is not cash versus no cash; it is lower expected drag versus explicit debt risk.</div>
+        </section>
+
+        <section id="limits">
+          <h2>Limitations And Next Tests</h2>
+          <ul>
+            <li>The direct total-return data begins in 1988, so the bootstrap window is much shorter than the annual 75-year report.</li>
+            <li>Five-year blocks on a 1988-present monthly sample can overfit modern market history.</li>
+            <li>Taxes, asset-backed lending fees, variable spreads, and lender discretion are ignored.</li>
+            <li>The model assumes credit remains available until the LTV limit is hit; real lenders can change terms earlier.</li>
+            <li>The model uses S&amp;P 500 Total Return as the whole portfolio, not a diversified taxable account with concentrated-position haircuts.</li>
+            <li>The next useful tests are different LTV caps, 1%-4% real credit spreads, 35- and 40-year horizons, and a hybrid rule that borrows only floor spending rather than target spending.</li>
+          </ul>
+          <footer>
+            Data sources: Yahoo/yfinance <code>^SP500TR</code> and FRED <code>CPIAUCSL</code>.
+          </footer>
+        </section>
+      </main>
+    </div>
+  </div>
+</body>
+</html>
