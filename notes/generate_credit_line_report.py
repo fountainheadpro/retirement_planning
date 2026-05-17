@@ -30,6 +30,8 @@ FLOOR_RATIO = 0.5
 REAL_CREDIT_SPREAD = 0.02
 MAX_LTV = 0.25
 TRIGGERS = [0.10, 0.20, 0.30, 0.40]
+MAIN_BORROW_RULE = "cap"
+COMPARISON_BORROW_RULE = "target"
 
 COLORS = {
     "ink": "#17212b",
@@ -134,6 +136,17 @@ def scenario_label(target_rate: float) -> str:
     return f"{target} target / {floor} floor"
 
 
+def borrow_rule_label(borrow_rule: str) -> str:
+    """Human-readable label for how much the credit line can fund."""
+    labels = {
+        "target": "Target-protecting credit",
+        "cap": "Hybrid cap-respecting credit",
+    }
+    if borrow_rule not in labels:
+        raise ValueError(f"Unknown borrow rule: {borrow_rule}")
+    return labels[borrow_rule]
+
+
 def spending_amount(wealth: np.ndarray, target_rate: float) -> np.ndarray:
     """Monthly target/cap/floor spending rule in real dollars."""
     target_monthly = target_rate / 12.0 * BASE
@@ -175,8 +188,12 @@ def run_credit_line(
     paths: dict[str, np.ndarray],
     trigger: float,
     target_rate: float,
+    borrow_rule: str = MAIN_BORROW_RULE,
 ) -> dict[str, np.ndarray]:
-    """Run target-preserving credit-line strategy through drawdown cycles."""
+    """Run credit-line strategy through drawdown cycles."""
+    if borrow_rule not in {"target", "cap"}:
+        raise ValueError(f"Unknown borrow rule: {borrow_rule}")
+
     assets = np.full(N_PATHS, BASE, dtype=float)
     debt = np.zeros(N_PATHS, dtype=float)
     market_index = np.ones(N_PATHS, dtype=float)
@@ -235,7 +252,14 @@ def run_credit_line(
 
         borrowed = np.zeros(N_PATHS, dtype=float)
         if np.any(can_borrow):
-            borrowed[can_borrow] = np.minimum(target_monthly, capacity[can_borrow])
+            if borrow_rule == "target":
+                borrow_need = np.full_like(assets, target_monthly)
+            else:
+                borrow_need = normal_desired
+            borrowed[can_borrow] = np.minimum(
+                borrow_need[can_borrow],
+                capacity[can_borrow],
+            )
             debt[can_borrow] += borrowed[can_borrow]
             credit_used[month, can_borrow & (borrowed > 0.0)] = True
 
@@ -265,7 +289,12 @@ def run_credit_line(
     }
 
 
-def summarize(label: str, simulation: dict[str, np.ndarray], target_rate: float) -> dict:
+def summarize(
+    label: str,
+    simulation: dict[str, np.ndarray],
+    target_rate: float,
+    borrow_rule: str = "none",
+) -> dict:
     """Summarize monthly path outcomes in report-ready metrics."""
     spending = simulation["spending"]
     net_values = simulation["net_values"]
@@ -297,6 +326,10 @@ def summarize(label: str, simulation: dict[str, np.ndarray], target_rate: float)
         "scenario": scenario_label(target_rate),
         "target_rate": target_rate,
         "floor_rate": target_rate * FLOOR_RATIO,
+        "borrow_rule": borrow_rule,
+        "borrow_rule_label": (
+            "Sell only" if borrow_rule == "none" else borrow_rule_label(borrow_rule)
+        ),
         "ruin_pct": float(np.mean(ruin_path) * 100),
         "ruin_count": int(np.sum(ruin_path)),
         "target_shortfall_pct": float(np.mean(target_shortfall) * 100),
@@ -320,7 +353,11 @@ def summarize(label: str, simulation: dict[str, np.ndarray], target_rate: float)
     }
 
 
-def run_strategy_rows(paths: dict[str, np.ndarray], target_rate: float) -> list[dict]:
+def run_strategy_rows(
+    paths: dict[str, np.ndarray],
+    target_rate: float,
+    borrow_rule: str = MAIN_BORROW_RULE,
+) -> list[dict]:
     """Run sell-only and credit-line trigger rows for one spending target."""
     rows: list[dict] = []
     baseline = summarize("Sell only", run_sell_baseline(paths, target_rate), target_rate)
@@ -329,11 +366,39 @@ def run_strategy_rows(paths: dict[str, np.ndarray], target_rate: float) -> list[
 
     for trigger in TRIGGERS:
         label = f"{trigger:.0%} trigger"
-        row = summarize(label, run_credit_line(paths, trigger, target_rate), target_rate)
+        row = summarize(
+            label,
+            run_credit_line(paths, trigger, target_rate, borrow_rule=borrow_rule),
+            target_rate,
+            borrow_rule=borrow_rule,
+        )
         row["trigger_pct"] = trigger * 100
         rows.append(row)
 
     return rows
+
+
+def build_scenarios(paths: dict[str, np.ndarray], borrow_rule: str) -> list[dict]:
+    """Run all spending scenarios for a borrow rule."""
+    return [
+        {
+            "label": scenario_label(target_rate),
+            "target_rate": target_rate,
+            "floor_rate": target_rate * FLOOR_RATIO,
+            "borrow_rule": borrow_rule,
+            "borrow_rule_label": borrow_rule_label(borrow_rule),
+            "rows": run_strategy_rows(paths, target_rate, borrow_rule=borrow_rule),
+        }
+        for target_rate in TARGET_RATES
+    ]
+
+
+def find_trigger_row(rows: list[dict], trigger_pct: float) -> dict:
+    """Find the row for a trigger percentage."""
+    for row in rows:
+        if row.get("trigger_pct") is not None and abs(row["trigger_pct"] - trigger_pct) < 1e-9:
+            return row
+    raise ValueError(f"Missing trigger row: {trigger_pct}%")
 
 
 def setup_style() -> None:
@@ -384,8 +449,8 @@ def plot_mechanics() -> None:
     ax.axis("off")
     title_block(
         fig,
-        "Credit-Line Mechanics",
-        "The line is a temporary spending bridge during drawdowns, then debt is repaid after market recovery.",
+        "Hybrid Credit-Line Mechanics",
+        "The loan replaces forced stock sales during drawdowns; it does not override the spending cap.",
     )
 
     boxes = [
@@ -403,8 +468,8 @@ def plot_mechanics() -> None:
         ),
         (
             0.53,
-            "3. Borrow spending",
-            "Monthly target spending is\nborrowed when collateral capacity\nis available. Debt costs CPI + 2%.",
+            "3. Borrow less",
+            "Borrow only the normal\ncap/floor spending amount.\nDebt costs CPI + 2%.",
             "#f7e2e6",
         ),
         (
@@ -466,7 +531,7 @@ def plot_tradeoff(scenarios: list[dict]) -> None:
     title_block(
         fig,
         "Credit-Line Trigger Search",
-        "5% and 4% target spending, monthly S&P 500 Total Return blocks, CPI + 2% credit cost, 25% max LTV.",
+        "Hybrid cap-respecting credit, monthly S&P 500 Total Return blocks, CPI + 2% credit cost, 25% max LTV.",
     )
 
     for idx, scenario in enumerate(scenarios):
@@ -489,7 +554,7 @@ def plot_tradeoff(scenarios: list[dict]) -> None:
             marker="o",
             color=color,
             linewidth=2.6,
-            label=f"{scenario['label']} credit",
+            label=f"{scenario['label']} hybrid credit",
         )
         ax1.text(
             xs[0] - 0.5,
@@ -574,7 +639,7 @@ def plot_objective(scenarios: list[dict]) -> None:
     title_block(
         fig,
         "Objective Tradeoff",
-        "Borrowing buys fewer shortfall months by accepting worse downside wealth and collateral risk.",
+        "The hybrid rule borrows less, so the test is whether reduced forced selling is worth the debt risk.",
     )
 
     colors = [COLORS["target"], COLORS["floor"]]
@@ -682,7 +747,7 @@ def scenario_result_sections(scenarios: list[dict]) -> str:
     for scenario in scenarios:
         sections.append(
             f"""
-          <h3>{scenario['label']}</h3>
+          <h3>{scenario['label']} · {scenario['borrow_rule_label']}</h3>
           <div class="table-wrap">
             <table>
               <thead>
@@ -718,24 +783,60 @@ def scenario_debt_sections(scenarios: list[dict]) -> str:
     return "\n".join(sections)
 
 
+def borrow_rule_comparison_table(
+    hybrid_scenarios: list[dict],
+    target_protecting_scenarios: list[dict],
+    trigger_pct: float = 20.0,
+) -> str:
+    """Render old versus new credit-line behavior at one drawdown trigger."""
+    body = []
+    for hybrid, target_protecting in zip(hybrid_scenarios, target_protecting_scenarios):
+        baseline = hybrid["rows"][0]
+        target_row = find_trigger_row(target_protecting["rows"], trigger_pct)
+        hybrid_row = find_trigger_row(hybrid["rows"], trigger_pct)
+        rows = [
+            ("Sell only", "No borrowing", baseline),
+            ("Old credit model", "Borrow full target spending", target_row),
+            ("Hybrid credit model", "Borrow target/cap/floor spending", hybrid_row),
+        ]
+        for strategy, funding_rule, row in rows:
+            body.append(
+                "<tr>"
+                f"<td>{hybrid['label']}</td>"
+                f"<td>{strategy}</td>"
+                f"<td>{funding_rule}</td>"
+                f"<td>{pct(row['ruin_pct'])}</td>"
+                f"<td>{pct(row['target_shortfall_pct'])}</td>"
+                f"<td>{pct(row['floor_breach_pct'])}</td>"
+                f"<td>{multiple(row['final_p10_multiple'])}</td>"
+                f"<td>{multiple(row['final_median_multiple'])}</td>"
+                f"<td>{pct(row['margin_event_pct'])}</td>"
+                "</tr>"
+            )
+    return "\n".join(body)
+
+
 def write_report(results: dict) -> None:
     scenarios = results["scenarios"]
+    target_protecting_scenarios = results["target_protecting_scenarios"]
     primary_rows = scenarios[0]["rows"]
-    comparison_rows = scenarios[1]["rows"]
+    lower_spend_rows = scenarios[1]["rows"]
     baseline = primary_rows[0]
-    comparison_baseline = comparison_rows[0]
+    lower_spend_baseline = lower_spend_rows[0]
     best_shortfall = min(primary_rows[1:], key=lambda row: row["target_shortfall_pct"])
-    comparison_best_shortfall = min(comparison_rows[1:], key=lambda row: row["target_shortfall_pct"])
+    lower_spend_best_shortfall = min(lower_spend_rows[1:], key=lambda row: row["target_shortfall_pct"])
+    hybrid_20 = find_trigger_row(primary_rows, 20.0)
+    target_protecting_20 = find_trigger_row(target_protecting_scenarios[0]["rows"], 20.0)
 
     html = f"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Can A Credit Line Replace Cash And Bonds?</title>
-  <meta name="description" content="A monthly S&P 500 total-return simulation testing an asset-backed credit line as a retirement drawdown buffer.">
-  <meta property="og:title" content="Can A Credit Line Replace Cash And Bonds?">
-  <meta property="og:description" content="A separate retirement report testing whether borrowing through drawdowns improves target spending without giving up too much real ending wealth.">
+  <title>Can A Hybrid Credit Line Replace Cash And Bonds?</title>
+  <meta name="description" content="A monthly S&P 500 total-return simulation testing a cap-respecting asset-backed credit line as a retirement drawdown buffer.">
+  <meta property="og:title" content="Can A Hybrid Credit Line Replace Cash And Bonds?">
+  <meta property="og:description" content="A separate retirement report testing whether a smaller, cap-respecting credit line can reduce forced selling without overriding flexible spending.">
   <meta property="og:type" content="article">
   <meta property="og:image" content="assets/credit_line_objective_tradeoff.png">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -852,26 +953,27 @@ def write_report(results: dict) -> None:
     <header class="hero">
       <div>
         <p class="eyebrow">Retirement Planning Report · May 16, 2026</p>
-        <h1>Can A Credit Line Replace Cash And Bonds?</h1>
-        <p class="dek">A monthly S&amp;P 500 total-return simulation testing whether an asset-backed credit line can preserve lifestyle through drawdowns without giving up the compounding benefit of staying fully invested.</p>
+        <h1>Can A Hybrid Credit Line Replace Cash And Bonds?</h1>
+        <p class="dek">A monthly S&amp;P 500 total-return simulation testing whether an asset-backed credit line can reduce forced selling during drawdowns while still letting discretionary spending flex down.</p>
       </div>
       <aside class="hero-panel">
         <img src="assets/credit_line_objective_tradeoff.png" alt="Objective tradeoff chart for sell-only and credit-line strategies.">
-        <p class="caption">The credit-line question is not whether borrowing can reduce forced selling. It is whether the reduced selling is worth the debt cost, LTV risk, and repayment drag.</p>
+        <p class="caption">The rebuilt model borrows less: the loan funds the normal target/cap/floor withdrawal instead of forcing full target spending through every drawdown.</p>
       </aside>
     </header>
 
     <div class="metric-strip">
       <div class="metric"><strong>{pct(baseline['target_shortfall_pct'])}</strong><span>target-shortfall path-months for 5% sell-only stock exposure</span></div>
-      <div class="metric"><strong>{pct(best_shortfall['target_shortfall_pct'])}</strong><span>best 5% credit-line target-shortfall result</span></div>
-      <div class="metric"><strong>{pct(comparison_baseline['target_shortfall_pct'])}</strong><span>target-shortfall path-months for 4% sell-only stock exposure</span></div>
-      <div class="metric"><strong>{pct(comparison_best_shortfall['target_shortfall_pct'])}</strong><span>best 4% credit-line target-shortfall result</span></div>
+      <div class="metric"><strong>{pct(best_shortfall['target_shortfall_pct'])}</strong><span>best 5% hybrid-credit target-shortfall result</span></div>
+      <div class="metric"><strong>{pct(lower_spend_baseline['target_shortfall_pct'])}</strong><span>target-shortfall path-months for 4% sell-only stock exposure</span></div>
+      <div class="metric"><strong>{pct(lower_spend_best_shortfall['target_shortfall_pct'])}</strong><span>best 4% hybrid-credit target-shortfall result</span></div>
     </div>
 
     <div class="layout">
       <nav>
         <a href="#summary">Summary</a>
         <a href="#setup">Setup</a>
+        <a href="#hybrid">Hybrid Rule</a>
         <a href="#results">Results</a>
         <a href="#debt">Debt Risk</a>
         <a href="#interpretation">Interpretation</a>
@@ -881,10 +983,10 @@ def write_report(results: dict) -> None:
         <section id="summary">
           <h2>Executive Summary</h2>
           <p class="lead">The credit-line strategy is a substitute for a cash buffer, not a free source of retirement income. It tries to solve one specific problem: do not sell equities after the market has already fallen.</p>
-          <p>The model keeps the retiree fully invested in the S&amp;P 500 Total Return index. When the index falls below a selected drawdown threshold, monthly target spending is borrowed against the portfolio at a real cost of 2% above inflation. When the index recovers to the pre-trigger high, the loan is repaid by selling shares.</p>
-          <p>This is the generous version of the credit-line idea: the line is used to protect target lifestyle spending, not just the minimum floor. That makes the upside visible, but it also exposes the full leverage tradeoff.</p>
-          <p>The result is mixed. The credit line can reduce target shortfall because it lets spending continue during drawdowns. But it introduces a new risk: debt and forced repayment. In the central version here, the loan is capped at 25% loan-to-value, and paths that breach that cap require forced selling.</p>
-          <blockquote>A credit line is not cash with a clever label. It is temporary leverage. It may be useful, but the model has to count interest, collateral limits, forced-sale risk, and the repayment drag after recovery.</blockquote>
+          <p>The first version of this experiment was too aggressive: once the market crossed the drawdown trigger, it borrowed full target spending. That protected lifestyle on paper, but it also ignored the core rule of the retirement plan: discretionary spending should fall when wealth falls.</p>
+          <p>This rebuild uses a hybrid rule. The retiree still follows the target/cap/floor spending rule. If the market is down enough, the credit line funds that reduced withdrawal instead of selling shares. When the index recovers to the pre-trigger high, the loan is repaid by selling shares.</p>
+          <p>That produces the better version of the idea. At the 5% target and 20% trigger, the old target-protecting model has {pct(target_protecting_20['ruin_pct'])} ruin and {pct(target_protecting_20['margin_event_pct'])} margin-event risk. The hybrid model has {pct(hybrid_20['ruin_pct'])} ruin and {pct(hybrid_20['margin_event_pct'])} margin-event risk because it borrows less.</p>
+          <blockquote>The credit line should not be used to pretend the drawdown did not happen. It should be used, if at all, to avoid selling shares while the spending rule already does its job.</blockquote>
         </section>
 
         <section id="setup">
@@ -918,7 +1020,8 @@ cap = target rate / 12 of current real net wealth
 normal spending = min(net wealth, max(floor, min(target, cap)))
 
 if drawdown trigger is active:
-    borrow target spending when collateral capacity is available
+    borrow normal spending when collateral capacity is available
+    sell shares only for any unfunded remainder
     repay debt after the total-return index recovers to the pre-trigger high</pre>
           <figure class="figure">
             <img src="assets/credit_line_mechanics.png" alt="Credit-line mechanics diagram.">
@@ -926,9 +1029,26 @@ if drawdown trigger is active:
           </figure>
         </section>
 
+        <section id="hybrid">
+          <h2>The Hybrid Rule</h2>
+          <p>The key change is that borrowing no longer overrides the lifestyle cut. If the portfolio is below its starting value, the cap already reduces discretionary spending. The loan can fund that smaller withdrawal, but it cannot force spending back to the full target.</p>
+          <p>This matters because the old target-protecting model mixed two ideas together: avoid selling after a drawdown and maintain full lifestyle spending after a drawdown. The hybrid model tests only the first idea.</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Scenario</th><th>Strategy</th><th>Funding rule at 20% trigger</th><th>Ruin</th><th>Target shortfall</th><th>Floor breach</th><th>Real final p10</th><th>Real final median</th><th>Margin event</th></tr>
+              </thead>
+              <tbody>
+                {borrow_rule_comparison_table(scenarios, target_protecting_scenarios)}
+              </tbody>
+            </table>
+          </div>
+          <p>The comparison makes the tradeoff explicit. The old credit model can show fewer target-shortfall months because it borrows enough to keep spending near target. The hybrid model gives up some of that lifestyle smoothing, but it reduces debt pressure and keeps the retirement rule internally consistent.</p>
+        </section>
+
         <section id="results">
           <h2>Results</h2>
-          <p>The tables compare the sell-only baseline against credit lines triggered at 10%, 20%, 30%, and 40% drawdowns from the S&amp;P 500 Total Return high-water mark. The 4% path is the same strategy with lower spending pressure.</p>
+          <p>The tables compare the sell-only baseline against the hybrid cap-respecting credit line triggered at 10%, 20%, 30%, and 40% drawdowns from the S&amp;P 500 Total Return high-water mark. The 4% path is the same strategy with lower spending pressure.</p>
           {scenario_result_sections(scenarios)}
           <figure class="figure">
             <img src="assets/credit_line_trigger_search.png" alt="Credit-line trigger search chart.">
@@ -949,9 +1069,9 @@ if drawdown trigger is active:
 
         <section id="interpretation">
           <h2>Interpretation</h2>
-          <p>The credit line is most attractive when it is used rarely, at moderate drawdowns, and repaid after a strong recovery. It is least attractive when markets continue falling after borrowing begins. That is exactly when an asset-backed lender can reduce available credit, raise collateral requirements, or force sales.</p>
-          <p>Compared with cash and bonds, the credit line preserves upside because the portfolio stays invested until a drawdown actually happens. That is the appealing part. The cost is that the bad case is more operationally fragile: the retiree now depends on lending terms, collateral capacity, and the ability to tolerate debt during the same market stress that caused the borrowing.</p>
-          <div class="callout"><b>Bottom line:</b> a securities-backed credit line can be a reasonable tactical liquidity tool, but it is not a clean replacement for cash or bonds. It improves some target-spending outcomes in this model only by introducing leverage and collateral risk. The right comparison is not cash versus no cash; it is lower expected drag versus explicit debt risk.</div>
+          <p>The hybrid credit line is most attractive when it is used rarely, at moderate drawdowns, and repaid after a strong recovery. It is least attractive when markets continue falling after borrowing begins. That is exactly when an asset-backed lender can reduce available credit, raise collateral requirements, or force sales.</p>
+          <p>Compared with cash and bonds, the hybrid line preserves upside because the portfolio stays invested until a drawdown actually happens. Compared with the old target-protecting loan rule, it is less fragile because it borrows a smaller amount and lets discretionary spending fall.</p>
+          <div class="callout"><b>Bottom line:</b> a securities-backed credit line can be a reasonable tactical liquidity tool when it respects the spending rule. It is not a clean replacement for cash or bonds, but the hybrid version is the right version to test: lower expected drag than a permanent buffer, less leverage risk than borrowing full target spending.</div>
         </section>
 
         <section id="limits">
@@ -962,7 +1082,7 @@ if drawdown trigger is active:
             <li>Taxes, asset-backed lending fees, variable spreads, and lender discretion are ignored.</li>
             <li>The model assumes credit remains available until the LTV limit is hit; real lenders can change terms earlier.</li>
             <li>The model uses S&amp;P 500 Total Return as the whole portfolio, not a diversified taxable account with concentrated-position haircuts.</li>
-            <li>The next useful tests are different LTV caps, 1%-4% real credit spreads, 35- and 40-year horizons, and a hybrid rule that borrows only floor spending rather than target spending.</li>
+            <li>The next useful tests are different LTV caps, 1%-4% real credit spreads, 35- and 40-year horizons, and a more defensive rule that borrows only floor spending.</li>
           </ul>
           <footer>
             Data sources: Yahoo/yfinance <code>^SP500TR</code> and FRED <code>CPIAUCSL</code>.
@@ -984,15 +1104,8 @@ def main() -> None:
     history = fetch_monthly_history()
     paths = sample_monthly_paths(history)
 
-    scenarios = [
-        {
-            "label": scenario_label(target_rate),
-            "target_rate": target_rate,
-            "floor_rate": target_rate * FLOOR_RATIO,
-            "rows": run_strategy_rows(paths, target_rate),
-        }
-        for target_rate in TARGET_RATES
-    ]
+    scenarios = build_scenarios(paths, MAIN_BORROW_RULE)
+    target_protecting_scenarios = build_scenarios(paths, COMPARISON_BORROW_RULE)
 
     results = {
         "settings": {
@@ -1007,6 +1120,8 @@ def main() -> None:
             "floor_ratio": FLOOR_RATIO,
             "real_credit_spread": REAL_CREDIT_SPREAD,
             "max_ltv": MAX_LTV,
+            "main_borrow_rule": MAIN_BORROW_RULE,
+            "comparison_borrow_rule": COMPARISON_BORROW_RULE,
             "data_start": history.start_month,
             "data_end": history.end_month,
             "n_months": history.n_months,
@@ -1014,6 +1129,7 @@ def main() -> None:
             "inflation_source": "FRED CPIAUCSL monthly CPI-U",
         },
         "scenarios": scenarios,
+        "target_protecting_scenarios": target_protecting_scenarios,
         "rows": scenarios[0]["rows"],
     }
 

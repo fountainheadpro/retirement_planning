@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Can A Credit Line Replace Cash And Bonds?</title>
-  <meta name="description" content="A monthly S&P 500 total-return simulation testing an asset-backed credit line as a retirement drawdown buffer.">
-  <meta property="og:title" content="Can A Credit Line Replace Cash And Bonds?">
-  <meta property="og:description" content="A separate retirement report testing whether borrowing through drawdowns improves target spending without giving up too much real ending wealth.">
+  <title>Can A Hybrid Credit Line Replace Cash And Bonds?</title>
+  <meta name="description" content="A monthly S&P 500 total-return simulation testing a cap-respecting asset-backed credit line as a retirement drawdown buffer.">
+  <meta property="og:title" content="Can A Hybrid Credit Line Replace Cash And Bonds?">
+  <meta property="og:description" content="A separate retirement report testing whether a smaller, cap-respecting credit line can reduce forced selling without overriding flexible spending.">
   <meta property="og:type" content="article">
   <meta property="og:image" content="assets/credit_line_objective_tradeoff.png">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -123,26 +123,27 @@
     <header class="hero">
       <div>
         <p class="eyebrow">Retirement Planning Report · May 16, 2026</p>
-        <h1>Can A Credit Line Replace Cash And Bonds?</h1>
-        <p class="dek">A monthly S&amp;P 500 total-return simulation testing whether an asset-backed credit line can preserve lifestyle through drawdowns without giving up the compounding benefit of staying fully invested.</p>
+        <h1>Can A Hybrid Credit Line Replace Cash And Bonds?</h1>
+        <p class="dek">A monthly S&amp;P 500 total-return simulation testing whether an asset-backed credit line can reduce forced selling during drawdowns while still letting discretionary spending flex down.</p>
       </div>
       <aside class="hero-panel">
         <img src="assets/credit_line_objective_tradeoff.png" alt="Objective tradeoff chart for sell-only and credit-line strategies.">
-        <p class="caption">The credit-line question is not whether borrowing can reduce forced selling. It is whether the reduced selling is worth the debt cost, LTV risk, and repayment drag.</p>
+        <p class="caption">The rebuilt model borrows less: the loan funds the normal target/cap/floor withdrawal instead of forcing full target spending through every drawdown.</p>
       </aside>
     </header>
 
     <div class="metric-strip">
       <div class="metric"><strong>23.50%</strong><span>target-shortfall path-months for 5% sell-only stock exposure</span></div>
-      <div class="metric"><strong>13.62%</strong><span>best 5% credit-line target-shortfall result</span></div>
+      <div class="metric"><strong>22.29%</strong><span>best 5% hybrid-credit target-shortfall result</span></div>
       <div class="metric"><strong>18.47%</strong><span>target-shortfall path-months for 4% sell-only stock exposure</span></div>
-      <div class="metric"><strong>8.85%</strong><span>best 4% credit-line target-shortfall result</span></div>
+      <div class="metric"><strong>17.61%</strong><span>best 4% hybrid-credit target-shortfall result</span></div>
     </div>
 
     <div class="layout">
       <nav>
         <a href="#summary">Summary</a>
         <a href="#setup">Setup</a>
+        <a href="#hybrid">Hybrid Rule</a>
         <a href="#results">Results</a>
         <a href="#debt">Debt Risk</a>
         <a href="#interpretation">Interpretation</a>
@@ -152,10 +153,10 @@
         <section id="summary">
           <h2>Executive Summary</h2>
           <p class="lead">The credit-line strategy is a substitute for a cash buffer, not a free source of retirement income. It tries to solve one specific problem: do not sell equities after the market has already fallen.</p>
-          <p>The model keeps the retiree fully invested in the S&amp;P 500 Total Return index. When the index falls below a selected drawdown threshold, monthly target spending is borrowed against the portfolio at a real cost of 2% above inflation. When the index recovers to the pre-trigger high, the loan is repaid by selling shares.</p>
-          <p>This is the generous version of the credit-line idea: the line is used to protect target lifestyle spending, not just the minimum floor. That makes the upside visible, but it also exposes the full leverage tradeoff.</p>
-          <p>The result is mixed. The credit line can reduce target shortfall because it lets spending continue during drawdowns. But it introduces a new risk: debt and forced repayment. In the central version here, the loan is capped at 25% loan-to-value, and paths that breach that cap require forced selling.</p>
-          <blockquote>A credit line is not cash with a clever label. It is temporary leverage. It may be useful, but the model has to count interest, collateral limits, forced-sale risk, and the repayment drag after recovery.</blockquote>
+          <p>The first version of this experiment was too aggressive: once the market crossed the drawdown trigger, it borrowed full target spending. That protected lifestyle on paper, but it also ignored the core rule of the retirement plan: discretionary spending should fall when wealth falls.</p>
+          <p>This rebuild uses a hybrid rule. The retiree still follows the target/cap/floor spending rule. If the market is down enough, the credit line funds that reduced withdrawal instead of selling shares. When the index recovers to the pre-trigger high, the loan is repaid by selling shares.</p>
+          <p>That produces the better version of the idea. At the 5% target and 20% trigger, the old target-protecting model has 2.72% ruin and 28.10% margin-event risk. The hybrid model has 0.87% ruin and 16.32% margin-event risk because it borrows less.</p>
+          <blockquote>The credit line should not be used to pretend the drawdown did not happen. It should be used, if at all, to avoid selling shares while the spending rule already does its job.</blockquote>
         </section>
 
         <section id="setup">
@@ -189,7 +190,8 @@ cap = target rate / 12 of current real net wealth
 normal spending = min(net wealth, max(floor, min(target, cap)))
 
 if drawdown trigger is active:
-    borrow target spending when collateral capacity is available
+    borrow normal spending when collateral capacity is available
+    sell shares only for any unfunded remainder
     repay debt after the total-return index recovers to the pre-trigger high</pre>
           <figure class="figure">
             <img src="assets/credit_line_mechanics.png" alt="Credit-line mechanics diagram.">
@@ -197,11 +199,33 @@ if drawdown trigger is active:
           </figure>
         </section>
 
+        <section id="hybrid">
+          <h2>The Hybrid Rule</h2>
+          <p>The key change is that borrowing no longer overrides the lifestyle cut. If the portfolio is below its starting value, the cap already reduces discretionary spending. The loan can fund that smaller withdrawal, but it cannot force spending back to the full target.</p>
+          <p>This matters because the old target-protecting model mixed two ideas together: avoid selling after a drawdown and maintain full lifestyle spending after a drawdown. The hybrid model tests only the first idea.</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Scenario</th><th>Strategy</th><th>Funding rule at 20% trigger</th><th>Ruin</th><th>Target shortfall</th><th>Floor breach</th><th>Real final p10</th><th>Real final median</th><th>Margin event</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>5% target / 2.5% floor</td><td>Sell only</td><td>No borrowing</td><td>0.62%</td><td>23.50%</td><td>0.08%</td><td>0.74x</td><td>4.06x</td><td>0.00%</td></tr>
+<tr><td>5% target / 2.5% floor</td><td>Old credit model</td><td>Borrow full target spending</td><td>2.72%</td><td>14.98%</td><td>0.53%</td><td>0.54x</td><td>4.12x</td><td>28.10%</td></tr>
+<tr><td>5% target / 2.5% floor</td><td>Hybrid credit model</td><td>Borrow target/cap/floor spending</td><td>0.87%</td><td>22.29%</td><td>0.15%</td><td>0.80x</td><td>4.28x</td><td>16.32%</td></tr>
+<tr><td>4% target / 2% floor</td><td>Sell only</td><td>No borrowing</td><td>0.11%</td><td>18.47%</td><td>0.01%</td><td>1.07x</td><td>5.14x</td><td>0.00%</td></tr>
+<tr><td>4% target / 2% floor</td><td>Old credit model</td><td>Borrow full target spending</td><td>0.92%</td><td>10.08%</td><td>0.14%</td><td>0.92x</td><td>5.20x</td><td>17.44%</td></tr>
+<tr><td>4% target / 2% floor</td><td>Hybrid credit model</td><td>Borrow target/cap/floor spending</td><td>0.23%</td><td>17.61%</td><td>0.03%</td><td>1.13x</td><td>5.35x</td><td>10.76%</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>The comparison makes the tradeoff explicit. The old credit model can show fewer target-shortfall months because it borrows enough to keep spending near target. The hybrid model gives up some of that lifestyle smoothing, but it reduces debt pressure and keeps the retirement rule internally consistent.</p>
+        </section>
+
         <section id="results">
           <h2>Results</h2>
-          <p>The tables compare the sell-only baseline against credit lines triggered at 10%, 20%, 30%, and 40% drawdowns from the S&amp;P 500 Total Return high-water mark. The 4% path is the same strategy with lower spending pressure.</p>
+          <p>The tables compare the sell-only baseline against the hybrid cap-respecting credit line triggered at 10%, 20%, 30%, and 40% drawdowns from the S&amp;P 500 Total Return high-water mark. The 4% path is the same strategy with lower spending pressure.</p>
           
-          <h3>5% target / 2.5% floor</h3>
+          <h3>5% target / 2.5% floor · Hybrid cap-respecting credit</h3>
           <div class="table-wrap">
             <table>
               <thead>
@@ -209,15 +233,15 @@ if drawdown trigger is active:
               </thead>
               <tbody>
                 <tr><td>Sell only</td><td>n/a</td><td>0.62%</td><td>23.50%</td><td>0.08%</td><td>0.74x</td><td>4.06x</td><td>0.00%</td><td>0.00%</td></tr>
-<tr><td>10% trigger</td><td>10%</td><td>3.17%</td><td>13.62%</td><td>0.62%</td><td>0.50x</td><td>4.13x</td><td>100.00%</td><td>32.16%</td></tr>
-<tr><td>20% trigger</td><td>20%</td><td>2.72%</td><td>14.98%</td><td>0.53%</td><td>0.54x</td><td>4.12x</td><td>97.50%</td><td>28.10%</td></tr>
-<tr><td>30% trigger</td><td>30%</td><td>2.54%</td><td>15.91%</td><td>0.50%</td><td>0.56x</td><td>4.10x</td><td>88.83%</td><td>25.35%</td></tr>
-<tr><td>40% trigger</td><td>40%</td><td>2.32%</td><td>16.99%</td><td>0.44%</td><td>0.59x</td><td>4.09x</td><td>81.69%</td><td>20.89%</td></tr>
+<tr><td>10% trigger</td><td>10%</td><td>0.95%</td><td>22.29%</td><td>0.17%</td><td>0.79x</td><td>4.31x</td><td>100.00%</td><td>19.02%</td></tr>
+<tr><td>20% trigger</td><td>20%</td><td>0.87%</td><td>22.29%</td><td>0.15%</td><td>0.80x</td><td>4.28x</td><td>97.50%</td><td>16.32%</td></tr>
+<tr><td>30% trigger</td><td>30%</td><td>0.84%</td><td>22.36%</td><td>0.14%</td><td>0.80x</td><td>4.26x</td><td>88.83%</td><td>14.52%</td></tr>
+<tr><td>40% trigger</td><td>40%</td><td>0.78%</td><td>22.50%</td><td>0.12%</td><td>0.79x</td><td>4.22x</td><td>81.69%</td><td>12.46%</td></tr>
               </tbody>
             </table>
           </div>
 
-          <h3>4% target / 2% floor</h3>
+          <h3>4% target / 2% floor · Hybrid cap-respecting credit</h3>
           <div class="table-wrap">
             <table>
               <thead>
@@ -225,10 +249,10 @@ if drawdown trigger is active:
               </thead>
               <tbody>
                 <tr><td>Sell only</td><td>n/a</td><td>0.11%</td><td>18.47%</td><td>0.01%</td><td>1.07x</td><td>5.14x</td><td>0.00%</td><td>0.00%</td></tr>
-<tr><td>10% trigger</td><td>10%</td><td>1.07%</td><td>8.85%</td><td>0.17%</td><td>0.89x</td><td>5.21x</td><td>100.00%</td><td>19.91%</td></tr>
-<tr><td>20% trigger</td><td>20%</td><td>0.92%</td><td>10.08%</td><td>0.14%</td><td>0.92x</td><td>5.20x</td><td>97.50%</td><td>17.44%</td></tr>
-<tr><td>30% trigger</td><td>30%</td><td>0.84%</td><td>10.93%</td><td>0.13%</td><td>0.94x</td><td>5.20x</td><td>88.83%</td><td>15.37%</td></tr>
-<tr><td>40% trigger</td><td>40%</td><td>0.71%</td><td>12.01%</td><td>0.11%</td><td>0.96x</td><td>5.19x</td><td>81.69%</td><td>12.67%</td></tr>
+<tr><td>10% trigger</td><td>10%</td><td>0.25%</td><td>17.64%</td><td>0.04%</td><td>1.13x</td><td>5.38x</td><td>100.00%</td><td>12.18%</td></tr>
+<tr><td>20% trigger</td><td>20%</td><td>0.23%</td><td>17.61%</td><td>0.03%</td><td>1.13x</td><td>5.35x</td><td>97.50%</td><td>10.76%</td></tr>
+<tr><td>30% trigger</td><td>30%</td><td>0.22%</td><td>17.64%</td><td>0.03%</td><td>1.13x</td><td>5.33x</td><td>88.83%</td><td>9.89%</td></tr>
+<tr><td>40% trigger</td><td>40%</td><td>0.21%</td><td>17.73%</td><td>0.03%</td><td>1.13x</td><td>5.30x</td><td>81.69%</td><td>8.34%</td></tr>
               </tbody>
             </table>
           </div>
@@ -253,10 +277,10 @@ if drawdown trigger is active:
                 <tr><th>Strategy</th><th>Ever used credit</th><th>Median debt months if used</th><th>95th pct peak debt</th><th>Ever miss target</th><th>Avg shortfall gap</th><th>Integrated target loss</th></tr>
               </thead>
               <tbody>
-                <tr><td>10% trigger</td><td>100.00%</td><td>123</td><td>39.43%</td><td>79.42%</td><td>32.6%</td><td>4.44%</td></tr>
-<tr><td>20% trigger</td><td>97.50%</td><td>93</td><td>37.85%</td><td>84.91%</td><td>30.3%</td><td>4.53%</td></tr>
-<tr><td>30% trigger</td><td>88.83%</td><td>80</td><td>36.12%</td><td>85.45%</td><td>29.2%</td><td>4.65%</td></tr>
-<tr><td>40% trigger</td><td>81.69%</td><td>66</td><td>33.24%</td><td>86.54%</td><td>28.3%</td><td>4.81%</td></tr>
+                <tr><td>10% trigger</td><td>100.00%</td><td>123</td><td>39.82%</td><td>88.24%</td><td>26.9%</td><td>5.99%</td></tr>
+<tr><td>20% trigger</td><td>97.50%</td><td>93</td><td>37.99%</td><td>88.20%</td><td>26.6%</td><td>5.92%</td></tr>
+<tr><td>30% trigger</td><td>88.83%</td><td>80</td><td>36.39%</td><td>88.16%</td><td>26.4%</td><td>5.91%</td></tr>
+<tr><td>40% trigger</td><td>81.69%</td><td>66</td><td>33.48%</td><td>88.11%</td><td>26.3%</td><td>5.93%</td></tr>
               </tbody>
             </table>
           </div>
@@ -268,10 +292,10 @@ if drawdown trigger is active:
                 <tr><th>Strategy</th><th>Ever used credit</th><th>Median debt months if used</th><th>95th pct peak debt</th><th>Ever miss target</th><th>Avg shortfall gap</th><th>Integrated target loss</th></tr>
               </thead>
               <tbody>
-                <tr><td>10% trigger</td><td>100.00%</td><td>123</td><td>35.82%</td><td>75.79%</td><td>27.6%</td><td>2.44%</td></tr>
-<tr><td>20% trigger</td><td>97.50%</td><td>93</td><td>34.26%</td><td>82.05%</td><td>25.5%</td><td>2.57%</td></tr>
-<tr><td>30% trigger</td><td>88.83%</td><td>80</td><td>32.93%</td><td>82.60%</td><td>24.7%</td><td>2.70%</td></tr>
-<tr><td>40% trigger</td><td>81.69%</td><td>66</td><td>30.56%</td><td>83.83%</td><td>24.1%</td><td>2.90%</td></tr>
+                <tr><td>10% trigger</td><td>100.00%</td><td>123</td><td>35.82%</td><td>86.08%</td><td>24.6%</td><td>4.35%</td></tr>
+<tr><td>20% trigger</td><td>97.50%</td><td>93</td><td>34.26%</td><td>86.04%</td><td>24.4%</td><td>4.29%</td></tr>
+<tr><td>30% trigger</td><td>88.83%</td><td>80</td><td>32.91%</td><td>86.01%</td><td>24.2%</td><td>4.28%</td></tr>
+<tr><td>40% trigger</td><td>81.69%</td><td>66</td><td>30.39%</td><td>85.98%</td><td>24.1%</td><td>4.28%</td></tr>
               </tbody>
             </table>
           </div>
@@ -280,9 +304,9 @@ if drawdown trigger is active:
 
         <section id="interpretation">
           <h2>Interpretation</h2>
-          <p>The credit line is most attractive when it is used rarely, at moderate drawdowns, and repaid after a strong recovery. It is least attractive when markets continue falling after borrowing begins. That is exactly when an asset-backed lender can reduce available credit, raise collateral requirements, or force sales.</p>
-          <p>Compared with cash and bonds, the credit line preserves upside because the portfolio stays invested until a drawdown actually happens. That is the appealing part. The cost is that the bad case is more operationally fragile: the retiree now depends on lending terms, collateral capacity, and the ability to tolerate debt during the same market stress that caused the borrowing.</p>
-          <div class="callout"><b>Bottom line:</b> a securities-backed credit line can be a reasonable tactical liquidity tool, but it is not a clean replacement for cash or bonds. It improves some target-spending outcomes in this model only by introducing leverage and collateral risk. The right comparison is not cash versus no cash; it is lower expected drag versus explicit debt risk.</div>
+          <p>The hybrid credit line is most attractive when it is used rarely, at moderate drawdowns, and repaid after a strong recovery. It is least attractive when markets continue falling after borrowing begins. That is exactly when an asset-backed lender can reduce available credit, raise collateral requirements, or force sales.</p>
+          <p>Compared with cash and bonds, the hybrid line preserves upside because the portfolio stays invested until a drawdown actually happens. Compared with the old target-protecting loan rule, it is less fragile because it borrows a smaller amount and lets discretionary spending fall.</p>
+          <div class="callout"><b>Bottom line:</b> a securities-backed credit line can be a reasonable tactical liquidity tool when it respects the spending rule. It is not a clean replacement for cash or bonds, but the hybrid version is the right version to test: lower expected drag than a permanent buffer, less leverage risk than borrowing full target spending.</div>
         </section>
 
         <section id="limits">
@@ -293,7 +317,7 @@ if drawdown trigger is active:
             <li>Taxes, asset-backed lending fees, variable spreads, and lender discretion are ignored.</li>
             <li>The model assumes credit remains available until the LTV limit is hit; real lenders can change terms earlier.</li>
             <li>The model uses S&amp;P 500 Total Return as the whole portfolio, not a diversified taxable account with concentrated-position haircuts.</li>
-            <li>The next useful tests are different LTV caps, 1%-4% real credit spreads, 35- and 40-year horizons, and a hybrid rule that borrows only floor spending rather than target spending.</li>
+            <li>The next useful tests are different LTV caps, 1%-4% real credit spreads, 35- and 40-year horizons, and a more defensive rule that borrows only floor spending.</li>
           </ul>
           <footer>
             Data sources: Yahoo/yfinance <code>^SP500TR</code> and FRED <code>CPIAUCSL</code>.

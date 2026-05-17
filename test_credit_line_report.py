@@ -42,3 +42,35 @@ def test_run_strategy_rows_labels_target_rate():
 
     assert rows[0]["scenario"] == "4% target / 2% floor"
     assert rows[0]["target_rate"] == 0.04
+
+
+def test_cap_respecting_credit_line_borrows_only_reduced_spending():
+    """Hybrid credit line should not borrow full target after wealth falls."""
+    module = load_credit_line_module()
+    module.MONTHS = 1
+    module.N_PATHS = 1
+    paths = {
+        "stock_nominal": np.array([[-0.60]]),
+        "stock_real": np.array([[-0.60]]),
+        "inflation": np.zeros((1, 1)),
+    }
+
+    target_protecting = module.run_credit_line(
+        paths,
+        trigger=0.10,
+        target_rate=0.05,
+        borrow_rule="target",
+    )
+    cap_respecting = module.run_credit_line(
+        paths,
+        trigger=0.10,
+        target_rate=0.05,
+        borrow_rule="cap",
+    )
+
+    target_monthly = 0.05 / 12.0
+    reduced_spending = module.spending_amount(np.array([0.40]), target_rate=0.05)[0]
+
+    assert np.isclose(target_protecting["debt"][1, 0], target_monthly)
+    assert np.isclose(cap_respecting["debt"][1, 0], reduced_spending)
+    assert reduced_spending < target_monthly
