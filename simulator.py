@@ -1,11 +1,6 @@
-import streamlit as st
-import yfinance as yf
 import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
-import datetime
-import requests
-# Added statsmodels for robust ARIMA fitting
+# statsmodels for AR(p) mean-reversion market model calibration
 from statsmodels.tsa.arima.model import ARIMA
 
 # ==========================================
@@ -225,6 +220,8 @@ class MeanRevertingMarket:
             
             self.intercept = res.params[0]
             self.ar_coeffs = res.arparams 
+            # statsmodels ARIMA (p,0,0) with trend='c' places the innovation
+            # variance (sigma²) in the last parameter. We store the std dev.
             self.residual_std = np.sqrt(res.params[-1]) 
             
             # Set State (The most recent 'p' years from history)
@@ -241,8 +238,11 @@ class MeanRevertingMarket:
             }
             
         except Exception as e:
-            st.warning(f"ARIMA fitting failed: {e}. Falling back to synthetic.")
-            return None
+            # Pure function: propagate a clear error. Caller (app or notebook)
+            # decides how to present it to the user.
+            raise RuntimeError(
+                f"ARIMA({p}) calibration failed on {len(data)} observations: {e}"
+            ) from e
 
     def simulate_year(self, history_window, simulations=1):
         # ... (keep existing implementation) ...
@@ -287,32 +287,41 @@ class MeanRevertingMarket:
             
         return market_matrix
 
-@st.cache_data
-def get_sp500_data(history_years=60):
-    """Fetches S&P 500 Annual Returns from local CSV (Total Return)."""
+def get_sp500_data(history_years: int = 60) -> np.ndarray:
+    """
+    Load historical S&P 500 total returns (decimal) from local CSV.
+    
+    Pure function with no UI dependencies. Raises on failure so callers
+    (Streamlit app, notebooks, scripts) can handle errors appropriately.
+    """
+    path = "s_and_p_500_with_dividends.csv"
     try:
-        # CSV format: Year, Return% (e.g., 2024, 25.02)
-        # Assume file is in the same directory or root
-        df = pd.read_csv("s_and_p_500_with_dividends.csv", header=None, names=["Year", "Return"])
-        
-        # Convert percent to decimal
+        df = pd.read_csv(path, header=None, names=["Year", "Return"])
         df["Return"] = df["Return"] / 100.0
-        
-        # Sort by Year just in case
         df = df.sort_values("Year")
-        
-        # Take the last 'history_years'
         if len(df) > history_years:
             df = df.tail(history_years)
-            
-        return df["Return"].values
+        arr = df["Return"].to_numpy(dtype=float)
+        if len(arr) == 0:
+            raise ValueError("No data loaded after filtering.")
+        return arr
+    except FileNotFoundError:
+        raise FileNotFoundError(
+            f"Required data file not found: {path}. "
+            "Place it in the project root for AR model calibration."
+        ) from None
     except Exception as e:
-        st.error(f"Error loading S&P 500 data: {e}")
-        return None
+        raise RuntimeError(f"Failed to load S&P 500 data from {path}: {e}") from e
 
-@st.cache_data
-def get_stock_bond_data(history_years=75, bond_column="TreasuryBondReturn"):
-    """Load paired annual stock, bond, T-bill, and inflation records."""
+def get_stock_bond_data(
+    history_years: int = 75, bond_column: str = "TreasuryBondReturn"
+) -> dict:
+    """
+    Load paired annual stock, bond, T-bill, and inflation records from local CSVs.
+    
+    Pure function, no UI dependencies or caching. Raises on missing columns
+    or data problems. Callers (e.g. the Streamlit app) add @st.cache_data.
+    """
     returns = pd.read_csv("historical_asset_returns.csv")
     inflation = pd.read_csv("historical_inflation.csv")
     df = returns.merge(inflation, on="Year", how="inner", validate="one_to_one")
@@ -334,33 +343,33 @@ def get_stock_bond_data(history_years=75, bond_column="TreasuryBondReturn"):
         "corporate_bond_returns": df["CorporateBondReturn"].to_numpy(dtype=float),
     }
 
-def create_ar_model(history_years=50, ar_order=1):
+def create_ar_model(history_years: int = 50, ar_order: int = 1) -> tuple[MeanRevertingMarket, dict]:
     """
-    Creates and calibrates an AR(p) model using statsmodels.
+    Create and calibrate an AR(p) MeanRevertingMarket using statsmodels.
+    
+    Pure function (no Streamlit, no caching). Returns (model, stats_dict) on success.
+    Raises RuntimeError or ValueError on data load or calibration failure.
+    
+    The caller (e.g. Streamlit app) is responsible for formatting stats for display
+    and for any caching / error presentation.
     """
     model = MeanRevertingMarket(ar_order=ar_order)
-    stats_msg = "Error fetching data."
     
     # Use full available history for best calibration of long cycles
-    hist_returns = get_sp500_data(history_years=history_years) 
+    hist_returns = get_sp500_data(history_years=history_years)
     
     stats = model.calibrate_from_history(hist_returns)
+    # On success calibrate always returns a dict; it raises on failure.
     
-    if stats:
-        # Format coefficients for display
-        coeffs_str = ", ".join([f"{c:.2f}" for c in stats['ar_coeffs']])
-        stats_msg = (f"Calibrated AR({ar_order}) on {len(hist_returns)}y history.\n"
-                        f"Coeffs: [{coeffs_str}], "
-                        f"Vol: {stats['volatility']:.1%}, "
-                        f"Mean: {stats['mean_return']:.1%}")
-        
     return model, stats
 
-@st.cache_data
-def get_sp500_residuals(history_years):
+def get_sp500_residuals(history_years: int):
+    """
+    Compute mean and residuals for Random Walk / residual sampling.
+    Pure function; raises if underlying data load fails.
+    """
     hist = get_sp500_data(history_years)
-    if hist is None: return None, None, None # Return None for hist if no data
-    mu = np.mean(hist)
+    mu = float(np.mean(hist))
     residuals = hist - mu
     return mu, residuals, hist
 
@@ -416,15 +425,30 @@ def build_spending_reference_table(
 
 
 def run_simulation(
-    initial_net_worth, annual_spend, buffer_years, years, 
-    panic_threshold, inflation_rate, n_paths,
+    initial_net_worth: float,
+    annual_spend: float,
+    buffer_years: int,
+    years: int,
+    panic_threshold: float,
+    inflation_rate: float,
+    n_paths: int,
     market_model,
-    spending_cap_pct=0.04,
-    cash_interest_rate=None,
-    strategy: CashStrategy = None,
+    spending_cap_pct: float = 0.04,
+    cash_interest_rate: float | None = None,
+    strategy: CashStrategy | None = None,
     minimum_annual_spend: float = 0.0,
-    bond_allocation_pct: float = 0.0
-):
+    bond_allocation_pct: float = 0.0,
+    random_seed: int | None = None,
+) -> dict:
+    """
+    Run the full Monte Carlo retirement simulation.
+    
+    If random_seed is provided, np.random.seed() is called at the start for
+    reproducibility. Note: this affects global numpy state and is not
+    thread-safe. For advanced use, pass a seeded Generator into custom models.
+    """
+    if random_seed is not None:
+        np.random.seed(int(random_seed))
     # Default strategy
     if strategy is None:
         strategy = ConservativeStrategy()
@@ -534,6 +558,14 @@ def run_simulation(
         current_cash = np.maximum(0.0, current_cash * (1 + real_cash_return))
         
         # 3. Strategy Execution
+        #
+        # NOTE (tech debt): When bond_allocation_pct > 0 we take a separate inline
+        # path for withdrawal sourcing + bond rebalancing + replenishment.
+        # The non-bond path uses the Strategy protocol (pre/withdraw/post hooks).
+        # This duplication exists for historical reasons. Preferred future:
+        # extend StrategyContext with bond fields and implement bond-aware
+        # strategies (or composition) so there is a single source of truth.
+        # See strategies.py and the credit-line research for the direction.
         
         # Common Signals
         panic_mask = (market_return_nominal < panic_threshold) | (market_index < (market_peak * 0.999))
@@ -764,57 +796,6 @@ def run_simulation(
         'withdrawals_from_equity': withdrawals_from_equity,
         'replenishments': replenishments
     }
-
-def _source_funds(
-    desired: float,
-    market_return: float,
-    panic_threshold: float,
-    equity: float,
-    cash: float,
-    in_drawdown: bool = False,
-) -> float:
-    """Calculate actual withdrawal amount based on strategy."""
-    allocation = _allocate_withdrawal(
-        desired,
-        market_return,
-        panic_threshold,
-        equity,
-        cash,
-        in_drawdown,
-    )
-    return allocation[0]
-
-
-def _allocate_withdrawal(
-    desired: float,
-    market_return: float,
-    panic_threshold: float,
-    equity: float,
-    cash: float,
-    in_drawdown: bool = False,
-) -> tuple[float, float, float]:
-    """Allocate withdrawals between cash and equity without overdrawing.
-
-    Drawdown years trigger the same cash-first behavior as panic years.
-
-    Returns a tuple of (total_withdrawal, from_cash, from_equity).
-    """
-    available_equity = max(0.0, equity)
-    available_cash = max(0.0, cash)
-    available_total = available_equity + available_cash
-
-    actual_withdrawal = min(desired, available_total)
-
-    should_use_cash_first = (market_return < panic_threshold) or in_drawdown
-
-    if should_use_cash_first and available_cash > 0:
-        from_cash = min(actual_withdrawal, available_cash)
-        from_equity = min(actual_withdrawal - from_cash, available_equity)
-    else:
-        from_equity = min(actual_withdrawal, available_equity)
-        from_cash = min(actual_withdrawal - from_equity, available_cash)
-
-    return actual_withdrawal, from_cash, from_equity
 
 
 def calculate_statistics(

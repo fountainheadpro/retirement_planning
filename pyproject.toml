@@ -1,9 +1,11 @@
 [project]
 name = "retirement-planning"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.2.0"
+description = "Reproducible Monte Carlo retirement simulator with flexible spending rules, block bootstrap, AR models, and cash/buffer strategies. Companion to published sequence-risk research reports."
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.12"
+keywords = ["retirement", "monte-carlo", "sequence-risk", "withdrawal-rate", "block-bootstrap", "financial-planning"]
 dependencies = [
     "matplotlib>=3.10.7",
     "numpy>=2.3.5",

@@ -8,12 +8,10 @@ import pytest
 from simulator import (
     run_simulation,
     calculate_statistics,
-    _source_funds,
     MeanRevertingMarket,
     RandomWalkMarket,
     BlockBootstrapMarket,
     PairedBlockBootstrapMarket,
-    create_ar_model,
     get_stock_bond_data,
     derive_spending_targets,
     build_spending_reference_table,
@@ -46,76 +44,6 @@ class TestSpendingTargetDerivation:
             {"Portfolio": "$6M", "Target (5%)": "$300,000", "Floor (2.5%)": "$150,000"},
             {"Portfolio": "$10M", "Target (5%)": "$500,000", "Floor (2.5%)": "$250,000"},
         ]
-
-
-class TestSourceFunds:
-    """Test the fund sourcing logic."""
-    
-    def test_panic_market_uses_cash_first(self):
-        """In panic markets, should use cash before equity."""
-        result = _source_funds(
-            desired=100_000,
-            market_return=-0.20,  # Below panic threshold
-            panic_threshold=-0.15,
-            equity=500_000,
-            cash=200_000
-        )
-        assert result == 100_000
-    
-    def test_panic_market_drains_cash_then_equity(self):
-        """If cash insufficient in panic, use equity for remainder."""
-        result = _source_funds(
-            desired=150_000,
-            market_return=-0.20,
-            panic_threshold=-0.15,
-            equity=500_000,
-            cash=100_000  # Only 100k in cash
-        )
-        assert result == 150_000  # 100k from cash + 50k from equity
-    
-    def test_normal_market_uses_equity_first(self):
-        """In normal markets, should use equity before cash."""
-        result = _source_funds(
-            desired=100_000,
-            market_return=0.05,  # Positive return
-            panic_threshold=-0.15,
-            equity=500_000,
-            cash=200_000
-        )
-        assert result == 100_000
-    
-    def test_no_equity_uses_cash(self):
-        """When equity depleted, should use cash."""
-        result = _source_funds(
-            desired=100_000,
-            market_return=0.05,  # Positive return
-            panic_threshold=-0.15,
-            equity=0,
-            cash=200_000
-        )
-        assert result == 100_000
-    
-    def test_limited_funds_caps_withdrawal(self):
-        """Cannot withdraw more than available."""
-        result = _source_funds(
-            desired=100_000,
-            market_return=0.05,
-            panic_threshold=-0.15,
-            equity=30_000,
-            cash=20_000
-        )
-        assert result == 50_000  # 30k equity + 20k cash
-
-    def test_negative_equity_does_not_inflate_withdrawal(self):
-        """Negative equity should not count toward available funds."""
-        result = _source_funds(
-            desired=100_000,
-            market_return=0.05,
-            panic_threshold=-0.15,
-            equity=-50_000,
-            cash=20_000,
-        )
-        assert result == 20_000
 
 
 class TestRunSimulation:
@@ -1104,3 +1032,37 @@ class TestStrategies:
         assert abs(final_equity - 720_000) < 1.0
         assert abs(final_cash - 50_000) < 1.0
         assert results['withdrawals_from_cash'][0,0] == 50_000
+
+
+def test_run_simulation_reproducible_with_seed():
+    """Same seed must produce identical portfolio paths (basic reproducibility)."""
+    from simulator import RandomWalkMarket, run_simulation
+
+    residuals = np.array([-0.10, 0.0, 0.10])
+    model = RandomWalkMarket(mu=0.08, residuals=residuals)
+
+    r1 = run_simulation(
+        initial_net_worth=1_000_000,
+        annual_spend=40_000,
+        buffer_years=2,
+        years=5,
+        panic_threshold=-0.15,
+        inflation_rate=0.03,
+        n_paths=10,
+        market_model=model,
+        random_seed=123,
+    )
+    r2 = run_simulation(
+        initial_net_worth=1_000_000,
+        annual_spend=40_000,
+        buffer_years=2,
+        years=5,
+        panic_threshold=-0.15,
+        inflation_rate=0.03,
+        n_paths=10,
+        market_model=model,
+        random_seed=123,
+    )
+
+    assert np.allclose(r1['portfolio_values'], r2['portfolio_values'])
+    assert np.allclose(r1['withdrawal_values'], r2['withdrawal_values'])

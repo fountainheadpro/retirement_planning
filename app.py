@@ -56,6 +56,16 @@ This tool uses statistical models to simulate future market behavior,
 ensuring fat-tail events (2000, 2008) are represented in risk projections.
 """)
 
+with st.expander("📚 Published Research & Methodology", expanded=False):
+    st.markdown("""
+    The models and spending rules here power the detailed sequence-risk research reports:
+    
+    - **[Hybrid Credit Line Report](docs/credit-line.html)** — Can a securities-backed credit line (respecting the spending cap) meaningfully replace cash buffers or bonds? Monthly simulation, explicit debt dynamics, and pragmatic conclusions.
+    - **Stock/Bond Allocation & 4% Rule Tradeoffs** — See `notes/stock_bond_allocation_report_2026-05-13.md` (block bootstrap, 20k paths, target vs floor vs ruin metrics).
+    
+    **Reproducibility tip**: Enable "Fixed random seed" in Simulation Parameters to get bit-identical results for any published scenario.
+    """)
+
 # Sidebar Configuration
 st.sidebar.header("⚙️ Configuration")
 
@@ -244,6 +254,22 @@ with st.sidebar.expander("🎲 Simulation Parameters", expanded=True):
         value=5000
     )
 
+    use_fixed_seed = st.checkbox(
+        "Fixed random seed (reproducible runs)",
+        value=False,
+        help="Enable this and set a seed below to get identical results on every run. Useful for sharing specific scenarios or publishing exact report numbers."
+    )
+    random_seed = None
+    if use_fixed_seed:
+        random_seed = st.number_input(
+            "Random Seed",
+            min_value=0,
+            max_value=2**31 - 1,
+            value=42,
+            step=1,
+            help="Integer seed for the numpy RNG. Same seed + same parameters = identical paths."
+        )
+
     confidence = st.slider(
         "Confidence Level (%)",
         min_value=80,
@@ -305,15 +331,15 @@ if run_sim or 'results' not in st.session_state:
                 
             elif "Mean Reversion (AR-" in selected_model:
                 ar_p = int(selected_model.split("AR-")[1][:-1]) # Extract AR order from string
-                ar_model_calibrated, stats = create_ar_model(history_years, ar_order=ar_p)
-                if ar_model_calibrated:
+                try:
+                    ar_model_calibrated, stats = create_ar_model(history_years, ar_order=ar_p)
                     market_model = ar_model_calibrated
                     coeffs_str = ", ".join([f"{c:.2f}" for c in stats['ar_coeffs']])
                     model_info_msg = (f"Calibrated AR({ar_p}) (Coeffs: [{coeffs_str}], "
                                         f"Vol: {stats['volatility']:.1%}, "
                                         f"Mean: {stats['mean_return']:.1%})")
-                else:
-                    st.error("AR model calibration failed. Falling back to Random Walk.")
+                except Exception as e:
+                    st.error(f"AR model calibration failed: {e}. Falling back to Random Walk.")
                     mu, residuals, history = fetch_market_data(history_years)
                     market_model = RandomWalkMarket(mu, residuals)
                     model_info_msg = "Random Walk (AR model calibration failed)"
@@ -358,7 +384,8 @@ if run_sim or 'results' not in st.session_state:
             cash_interest_rate=cash_interest_rate,
             strategy=strategy_obj,
             minimum_annual_spend=minimum_annual_spend,
-            bond_allocation_pct=bond_allocation_pct
+            bond_allocation_pct=bond_allocation_pct,
+            random_seed=random_seed
         )
         # Use REAL (Inflation-Adjusted) values for all visualizations
         portfolio_vals = sim_results['portfolio_values']
@@ -388,7 +415,8 @@ if run_sim or 'results' not in st.session_state:
             'inflation_rate': inflation_rate,
             'bond_allocation_pct': bond_allocation_pct,
             'uses_historical_inflation': selected_model == "Stock/Bond Block Bootstrap",
-            'strategy': selected_strategy # Store string name for display logic
+            'strategy': selected_strategy, # Store string name for display logic
+            'random_seed': random_seed
         }
     }
 
@@ -454,6 +482,10 @@ if 'results' in st.session_state:
             f"{floor_breach:.1f}%",
             help=floor_help
         )
+    
+    seed_used = params.get('random_seed')
+    if seed_used is not None:
+        st.caption(f"Reproducible run with random seed = {seed_used}")
     
     # Portfolio Value Chart
     st.subheader("📊 Portfolio Value Projection (Real Dollars)")
