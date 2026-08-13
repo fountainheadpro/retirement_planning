@@ -1,6 +1,7 @@
 """Tests for shared ruin and shortfall statistics."""
 
 import numpy as np
+import pytest
 
 from metrics import ruin_ever, ruin_terminal, summarize_withdrawals
 
@@ -31,6 +32,8 @@ def test_summarize_withdrawals_on_synthetic_paths():
     assert summary["target_shortfall_ever_pct"] == 50.0
     assert summary["floor_breach_path_years"] == 1
     assert summary["final_median_multiple"] == 1.0
+    expected_loss = float(np.mean(np.maximum(1.0 - withdrawals, 0.0)))
+    assert summary["target_spend_delivered_pct"] == pytest.approx((1.0 - expected_loss) * 100)
 
 
 def test_ruin_ever_catches_mid_horizon_zero():

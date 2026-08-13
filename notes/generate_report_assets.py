@@ -698,6 +698,95 @@ def plot_objective_tradeoff_combined(results: dict) -> None:
     save(fig, "bond_report_objective_tradeoff_4_5.png")
 
 
+def load_followup() -> dict | None:
+    for path in (
+        ASSET_DIR / "followup_results.json",
+        ROOT.parent / "docs" / "assets" / "followup_results.json",
+    ):
+        if path.exists():
+            return json.loads(path.read_text())
+    return None
+
+
+def plot_erp_grid(followup: dict) -> None:
+    grid = followup.get("erp_grid") or []
+    if not grid:
+        return
+    levels = sorted({row["erp_kept"] for row in grid}, reverse=True)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11.2, 5.4))
+    title_block(
+        fig,
+        "When Does A Permanent Treasury Sleeve Pay?",
+        "4% target / 2% floor. Mean equity premium is scaled; crash sequencing is kept.",
+    )
+    palette = [COLORS["wealth"], COLORS["floor"], COLORS["accent"], COLORS["target"], COLORS["ruin"]]
+    for color, haircut in zip(palette, levels):
+        rows = sorted(
+            [row for row in grid if row["erp_kept"] == haircut],
+            key=lambda row: row["bond_pct"],
+        )
+        xs = [row["bond_pct"] * 100 for row in rows]
+        delivered = [
+            row.get(
+                "target_spend_delivered_pct",
+                100 - row["target_shortfall_integrated_loss_pct_target"],
+            )
+            for row in rows
+        ]
+        medians = [row["final_median_multiple"] for row in rows]
+        ax1.plot(xs, delivered, marker="o", color=color, linewidth=2.2, label=f"{haircut:.0%} ERP")
+        ax2.plot(xs, medians, marker="o", color=color, linewidth=2.2, label=f"{haircut:.0%} ERP")
+    ax1.set_xlabel("Bond allocation (%)")
+    ax1.set_ylabel("Target spending delivered (%)")
+    ax2.set_xlabel("Bond allocation (%)")
+    ax2.set_ylabel("Real median ending wealth (x)")
+    ax1.legend(frameon=False, fontsize=8.5)
+    ax2.legend(frameon=False, fontsize=8.5)
+    style_axis(ax1)
+    style_axis(ax2)
+    fig.subplots_adjust(top=0.82, left=0.08, right=0.98, bottom=0.14, wspace=0.28)
+    save(fig, "bond_report_erp_grid.png")
+
+
+def plot_terminal_wealth_cdf(followup: dict) -> None:
+    grid = followup.get("erp_grid") or []
+    historical = [
+        row for row in grid if abs(row.get("erp_kept", -1) - 1.0) < 1e-9 and "wealth_percentiles" in row
+    ]
+    if not historical:
+        return
+    fig, ax = plt.subplots(figsize=(9.6, 6.2))
+    title_block(
+        fig,
+        "Terminal Wealth CDF: 4% Flexible Rule",
+        "Historical equity premium. Bonds insure the far left tail, then sit below stocks.",
+    )
+    palette = {
+        0.0: COLORS["wealth"],
+        0.2: COLORS["floor"],
+        0.4: COLORS["accent"],
+        0.6: COLORS["target"],
+    }
+    for row in sorted(historical, key=lambda item: item["bond_pct"]):
+        pcts = row["wealth_percentiles"]
+        xs = [int(key[1:]) for key in pcts]
+        ys = [pcts[f"p{p}"] for p in xs]
+        ax.plot(
+            xs,
+            ys,
+            marker="o",
+            linewidth=2.3,
+            color=palette.get(row["bond_pct"], COLORS["ink"]),
+            label=f"{row['bond_pct']:.0%} bonds",
+        )
+    ax.set_xlabel("Terminal-wealth percentile")
+    ax.set_ylabel("Real ending wealth (x starting portfolio)")
+    ax.legend(frameon=False)
+    style_axis(ax, grid_axis="both")
+    fig.subplots_adjust(top=0.82, left=0.1, right=0.96, bottom=0.13)
+    save(fig, "bond_report_terminal_cdf.png")
+
+
 def main() -> None:
     setup_style()
     results = load_results()
@@ -709,6 +798,10 @@ def main() -> None:
     plot_bond_allocation(results)
     plot_objective_tradeoff(results)
     plot_objective_tradeoff_combined(results)
+    followup = load_followup()
+    if followup:
+        plot_erp_grid(followup)
+        plot_terminal_wealth_cdf(followup)
 
 
 if __name__ == "__main__":

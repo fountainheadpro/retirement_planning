@@ -93,6 +93,12 @@ def format_shortfall(row: dict) -> str:
     return format_pct(row["target_shortfall_pct"])
 
 
+def spend_delivered(row: dict) -> float:
+    if "target_spend_delivered_pct" in row:
+        return float(row["target_spend_delivered_pct"])
+    return 100.0 - float(row["target_shortfall_integrated_loss_pct_target"])
+
+
 def table(headers: list[str], rows: list[list[str]]) -> str:
     head = "".join(f"<th>{h}</th>" for h in headers)
     body = []
@@ -137,6 +143,7 @@ def render(results: dict) -> str:
             "Ruin",
             "Years wealth below start",
             "Ever miss target",
+            "Spend delivered",
             "Integrated target loss",
             "Real final median",
         ],
@@ -148,6 +155,7 @@ def render(results: dict) -> str:
                 format_ruin(flex4_stock, n_paths),
                 format_shortfall(flex4_stock),
                 format_pct(flex4_stock["target_shortfall_ever_pct"]),
+                format_pct(spend_delivered(flex4_stock)),
                 format_pct(flex4_stock["target_shortfall_integrated_loss_pct_target"]),
                 format_x(flex4_stock["final_median_multiple"]),
             ],
@@ -158,6 +166,7 @@ def render(results: dict) -> str:
                 format_ruin(flex4_6040, n_paths),
                 format_shortfall(flex4_6040),
                 format_pct(flex4_6040["target_shortfall_ever_pct"]),
+                format_pct(spend_delivered(flex4_6040)),
                 format_pct(flex4_6040["target_shortfall_integrated_loss_pct_target"]),
                 format_x(flex4_6040["final_median_multiple"]),
             ],
@@ -168,6 +177,7 @@ def render(results: dict) -> str:
                 format_ruin(fixed4, n_paths),
                 format_shortfall(fixed4),
                 format_pct(fixed4["target_shortfall_ever_pct"]),
+                format_pct(spend_delivered(fixed4)),
                 format_pct(fixed4["target_shortfall_integrated_loss_pct_target"]),
                 format_x(fixed4["final_median_multiple"]),
             ],
@@ -178,6 +188,7 @@ def render(results: dict) -> str:
                 format_ruin(flex5_stock, n_paths),
                 format_shortfall(flex5_stock),
                 format_pct(flex5_stock["target_shortfall_ever_pct"]),
+                format_pct(spend_delivered(flex5_stock)),
                 format_pct(flex5_stock["target_shortfall_integrated_loss_pct_target"]),
                 format_x(flex5_stock["final_median_multiple"]),
             ],
@@ -188,6 +199,7 @@ def render(results: dict) -> str:
                 format_ruin(flex5_6040, n_paths),
                 format_shortfall(flex5_6040),
                 format_pct(flex5_6040["target_shortfall_ever_pct"]),
+                format_pct(spend_delivered(flex5_6040)),
                 format_pct(flex5_6040["target_shortfall_integrated_loss_pct_target"]),
                 format_x(flex5_6040["final_median_multiple"]),
             ],
@@ -328,13 +340,12 @@ def render(results: dict) -> str:
     followup = results.get("followup")
     if followup:
         followup_n = int(followup.get("n_paths", n_paths))
-        followup_table = table(
+        robustness_table = table(
             [
                 "Experiment",
                 "Ruin",
                 "Years wealth below start",
-                "Ever miss",
-                "Integrated target loss",
+                "Spend delivered",
                 "Real final p10",
                 "Real final median",
             ],
@@ -343,64 +354,135 @@ def render(results: dict) -> str:
                     row["label"],
                     format_ruin(row, int(row.get("n_paths", followup_n))),
                     format_shortfall(row),
-                    format_pct(row["target_shortfall_ever_pct"]),
-                    format_pct(row["target_shortfall_integrated_loss_pct_target"]),
+                    format_pct(spend_delivered(row)),
                     format_x(row["final_p10_multiple"]),
                     format_x(row["final_median_multiple"]),
                 ]
                 for row in followup["rows"]
             ],
         )
+        erp_grid = followup.get("erp_grid") or []
+        erp_levels = sorted({row.get("erp_kept", 1.0) for row in erp_grid}, reverse=True)
+        bond_levels = sorted({row.get("bond_pct", 0.0) for row in erp_grid})
+        erp_lookup = {
+            (round(row["erp_kept"], 4), round(row["bond_pct"], 4)): row for row in erp_grid
+        }
+        erp_table = ""
+        if erp_grid:
+            erp_headers = ["Kept mean ERP"] + [f"{pct:.0%} bonds" for pct in bond_levels]
+            erp_body = []
+            for haircut in erp_levels:
+                cells = [f"{haircut:.0%}"]
+                for bond_pct in bond_levels:
+                    cell = erp_lookup.get((round(haircut, 4), round(bond_pct, 4)))
+                    if cell is None:
+                        cells.append("—")
+                    else:
+                        cells.append(
+                            f"{format_pct(spend_delivered(cell))} spend / "
+                            f"{format_x(cell['final_median_multiple'])} / "
+                            f"{format_ruin(cell, int(cell.get('n_paths', followup_n)))}"
+                        )
+                erp_body.append(cells)
+            erp_table = table(erp_headers, erp_body)
+        floor_rows = followup.get("floor_rows") or []
+        floor_table = ""
+        if floor_rows:
+            floor_table = table(
+                [
+                    "Policy",
+                    "Initial safe share",
+                    "Ruin",
+                    "Years wealth below start",
+                    "Spend delivered",
+                    "Real final median",
+                ],
+                [
+                    [
+                        row["label"],
+                        f"{row['bond_pct']:.0%}",
+                        format_ruin(row, int(row.get("n_paths", followup_n))),
+                        format_shortfall(row),
+                        format_pct(spend_delivered(row)),
+                        format_x(row["final_median_multiple"]),
+                    ]
+                    for row in floor_rows
+                ],
+            )
         by_label = {row["label"]: row for row in followup["rows"]}
-        half_erp = by_label.get("4% stock-only half ERP")
-        tips = by_label.get("4% TIPS-floor proxy 50%")
         prorata = by_label.get("4% pro-rata 60/40")
         crash = by_label.get("4% crash-sell-bonds 60/40")
+        sleeve = by_label.get("50% zero-real safe sleeve (rebalanced)")
         boy = by_label.get("4% stock-only beginning-of-year")
         notes = []
+        if erp_grid:
+            half = erp_lookup.get((0.5, 0.0))
+            half_40 = erp_lookup.get((0.5, 0.4))
+            hist_0 = erp_lookup.get((1.0, 0.0))
+            hist_40 = erp_lookup.get((1.0, 0.4))
+            if half and half_40:
+                notes.append(
+                    f"Once the mean US premium is cut in half, 40% Treasuries beat stock-only on both tails and spending: "
+                    f"{half_40['ruin_count']} ruined paths versus {half['ruin_count']}, and "
+                    f"{format_pct(spend_delivered(half_40))} versus {format_pct(spend_delivered(half))} of target spending delivered. "
+                    f"At the historical premium the ranking is the reverse on wealth ({format_x(hist_0['final_median_multiple'])} versus {format_x(hist_40['final_median_multiple'])}) while spending stays close."
+                    if hist_0 and hist_40
+                    else f"At a 50% mean premium, 40% Treasuries have {half_40['ruin_count']} ruined paths versus {half['ruin_count']} for stock-only."
+                )
         if crash and prorata:
             notes.append(
-                f"Pro-rata 60/40 and crash-sell-bonds are close: {format_shortfall(prorata)} vs {format_shortfall(crash)} years below start, "
-                f"{format_x(prorata['final_median_multiple'])} vs {format_x(crash['final_median_multiple'])} median wealth."
+                "Under annual rebalancing and frictionless trading, withdrawal source does not explain the 60/40 result. "
+                "Crash-sell-bonds and pro-rata restore the same bond share after the withdrawal, so the rows are identical."
             )
-        if tips:
+        if sleeve:
             notes.append(
-                f"A 50% TIPS-floor proxy (0% real) spends {format_shortfall(tips)} of years below start and ends at {format_x(tips['final_median_multiple'])}."
-            )
-        if half_erp:
-            notes.append(
-                f"Halving the equity premium over T-bills is the result that can change the story: {format_shortfall(half_erp)} years below start and {format_x(half_erp['final_median_multiple'])} median wealth."
+                f"The rebalanced 50% zero-real sleeve spends {format_shortfall(sleeve)} of years below start and ends at "
+                f"{format_x(sleeve['final_median_multiple'])}. That is the cost of keeping half the portfolio in a 0% real asset, not of matching a floor liability."
             )
         if boy:
             notes.append(
-                f"Beginning-of-year withdrawals keep the same spending rule but apply the year’s return after the withdrawal: {format_pct(boy['ruin_pct'])} ruin, {format_shortfall(boy)} years below start."
+                f"Beginning-of-year withdrawals are slightly harsher ({format_pct(boy['ruin_pct'])} ruin, "
+                f"{format_shortfall(boy)} years below start, {format_x(boy['final_median_multiple'])} median) and do not overturn stock-only."
             )
+        erp_fig = ""
+        if erp_grid:
+            erp_fig = """
+          <figure class="figure">
+            <img src="assets/bond_report_erp_grid.png" alt="Spend delivered and median wealth versus bond allocation under several mean equity premiums.">
+            <figcaption>Mean equity premium is scaled; year-to-year excess-return sequencing is kept. Bond and T-bill series are not haircut.</figcaption>
+          </figure>
+          <figure class="figure">
+            <img src="assets/bond_report_terminal_cdf.png" alt="Terminal wealth CDF by bond allocation at the historical equity premium.">
+            <figcaption>At the historical premium, a 40% Treasury sleeve is above stock-only only in the far left tail, then sits below it.</figcaption>
+          </figure>
+"""
         followup_html = f"""
         <section id="followup">
-          <h2>Experiment 6: Tests That Can Change The Conclusion</h2>
-          <p>These rows use the same seed family and 5-year blocks as the main tables, with {followup_n:,} paths. They isolate one assumption at a time.</p>
-          {followup_table}
+          <h2>Experiment 6: When Bonds Become Worthwhile</h2>
+          <p>These rows use the same seed family and 5-year blocks as the main tables, with {followup_n:,} paths. The equity-premium transform shifts only the <b>mean</b> excess return versus T-bills. Crash years stay crash years.</p>
+          {erp_table}
+          {erp_fig}
+          <h3>Robustness</h3>
+          {robustness_table}
+          {("<h3>Run-down floor bucket</h3>" + floor_table) if floor_table else ""}
           <p class="callout"><b>Read:</b> {" ".join(notes)}</p>
         </section>
 """
-        followup_nav = '<a href="#followup">6. Follow-up</a>'
+        followup_nav = '<a href="#followup">6. ERP And Floor</a>'
         followup_limits = (
-            "Several items that used to be future work are now in Experiment 6: "
-            "TIPS-floor proxy, pro-rata 60/40, beginning-of-year withdrawals, a 40-year horizon, "
-            "a 50% equity-premium haircut, and circular blocks."
+            "Experiment 6 now includes a mean-only ERP × allocation grid, a run-down 0% real floor bucket, "
+            "beginning-of-year withdrawals, a 40-year horizon, and circular blocks."
         )
         tips_sentence = (
-            "A TIPS-floor proxy and a halved equity premium are in Experiment 6; they are the cases most likely to change how much stock-only ‘lifestyle reliability’ is just the realized US premium."
+            "A run-down 0% real floor bucket and a mean-only ERP grid are in Experiment 6. "
+            "They separate “stocks did well in this sample” from “a permanent Treasury sleeve is the right insurance.”"
         )
     else:
         followup_html = ""
         followup_nav = ""
-        followup_limits = (
-            "TIPS-floor funding, pro-rata spending, beginning-of-year withdrawals, longer horizons, "
-            "and a lower equity premium remain the tests that can still change the conclusion."
-        )
+        followup_limits = ""
         tips_sentence = (
-            "A TIPS floor plus equities — the policy implied by mandatory versus discretionary spending — is not in these tables."
+            "A household that values floor certainty or a smaller left tail can still prefer a bond sleeve."
         )
 
     return f"""<!doctype html>
@@ -516,7 +598,7 @@ def render(results: dict) -> str:
       <div>
         <p class="eyebrow">Retirement Planning Report · May 14, 2026</p>
         <h1>The Measurable Tradeoffs Behind The 4% Rule</h1>
-        <p class="dek">Under a flexible target/cap/floor rule, classic fixed 4% 60/40 ruin mostly disappears. Extra permanent 10-year Treasuries then buy little extra safety and more years below starting wealth.</p>
+        <p class="dek">At a flexible 4% target, a permanent 40% 10-year Treasury sleeve mostly insures the extreme left tail. Average spending barely changes; the long-term wealth cushion is cut roughly in half.</p>
       </div>
       <aside class="hero-panel">
         <img src="assets/bond_report_objective_tradeoff.png" alt="Objective tradeoff chart showing higher bond allocations moving toward more years below starting wealth and lower median wealth.">
@@ -562,12 +644,12 @@ def render(results: dict) -> str:
           <h2>Executive Summary</h2>
           <p class="lead">Imagine someone retiring with a portfolio of a few million dollars. Some spending is mandatory: food, basic housing, utilities, insurance, taxes, and health care. Other spending is discretionary: travel, nicer housing, gifts, upgrades, and the parts of life that make retirement feel abundant.</p>
           <p>That budget naturally creates two retirement objectives. The <b>target</b> is the preferred lifestyle. The <b>floor</b> is the minimum acceptable lifestyle. This report replaces labels like conservative and aggressive with measurable tradeoffs: ruin, years below starting wealth, floor-breach risk, shortfall depth, and real ending wealth.</p>
-          <p>The useful comparison is at one spending rate. Classic fixed-real 4% 60/40 has {format_pct(fixed4["ruin_pct"])} ruin in this model — in the Trinity neighborhood. The same 4% target with a flexible cap/floor rule cuts stock-only ruin to {format_pct(flex4_stock["ruin_pct"])}. Adding a permanent 40% 10-year Treasury sleeve then cuts ruin from {flex4_stock["ruin_count"]} paths to {flex4_6040["ruin_count"]} path, while years below starting wealth rise from {format_shortfall(flex4_stock)} to {format_shortfall(flex4_6040)} and real median ending wealth falls from {format_x(flex4_stock["final_median_multiple"])} to {format_x(flex4_6040["final_median_multiple"])}.</p>
+          <p>The useful comparison is at one spending rate. Classic fixed-real 4% 60/40 has {format_pct(fixed4["ruin_pct"])} ruin in this model — numerically close to the historical failure rate associated with the original Trinity results, though the methodology differs (block bootstrap, 10-year Treasuries, and annual year-end withdrawals versus Trinity’s historical payout periods, corporate bonds, and monthly inflation-adjusted withdrawals). The same 4% target with a flexible cap/floor rule cuts stock-only ruin to {format_pct(flex4_stock["ruin_pct"])}. Adding a permanent 40% 10-year Treasury sleeve then cuts ruin from {flex4_stock["ruin_count"]} paths to {flex4_6040["ruin_count"]} path. Years below starting wealth rise from {format_shortfall(flex4_stock)} to {format_shortfall(flex4_6040)}, but lifetime target spending delivered only moves from {format_pct(spend_delivered(flex4_stock))} to {format_pct(spend_delivered(flex4_6040))}. Real median ending wealth falls from {format_x(flex4_stock["final_median_multiple"])} to {format_x(flex4_6040["final_median_multiple"])}.</p>
           <div class="callout">
             <b>What the rule is doing:</b> when the target rate equals the cap rate, a target-shortfall year is a year the real portfolio is below its start. Stock-only “maintains lifestyle” here mostly because US equities in {start_year}–{end_year} spend fewer years underwater than a 10-year Treasury sleeve. A household that weights a funded floor or a smaller left tail more than median terminal wealth can still prefer bonds.
           </div>
           {benchmark}
-          <p>Flexible 4% stock-only still misses the target on {format_pct(flex4_stock["target_shortfall_ever_pct"])} of paths. Integrated target loss, which weights depth rather than a binary miss, is {format_pct(flex4_stock["target_shortfall_integrated_loss_pct_target"])} for stock-only versus {format_pct(flex4_6040["target_shortfall_integrated_loss_pct_target"])} for 60/40. Ruin rates below 0.2% are shown as counts plus a 95% Wilson interval; one path in {n_paths:,} is not a precise rate.</p>
+          <p>Flexible 4% stock-only still misses the target on {format_pct(flex4_stock["target_shortfall_ever_pct"])} of paths. The binary “years below start” gap is large because 60/40 spends more years slightly underwater. Integrated target loss, the depth-weighted companion, is {format_pct(flex4_stock["target_shortfall_integrated_loss_pct_target"])} versus {format_pct(flex4_6040["target_shortfall_integrated_loss_pct_target"])} — that is {format_pct(spend_delivered(flex4_stock))} versus {format_pct(spend_delivered(flex4_6040))} of desired lifetime spending delivered. The main economic cost of 60/40 in this sample is the longevity cushion, not current lifestyle. Ruin rates below 0.2% are shown as counts plus a 95% Wilson interval; one path in {n_paths:,} is not a precise rate.</p>
         </section>
 
         <section id="setup">
@@ -695,14 +777,14 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
             <figcaption>Both the 4% and 5% target cases show the same movement: more 10-year Treasuries mean more years below start and lower real median ending wealth.</figcaption>
           </figure>
           <p>Ending wealth is a longevity cushion. A 30-year simulation is a modeling horizon, not a known lifespan. The difference between ending with {format_x(bonds5_0["final_median_multiple"])} and {format_x(bonds5_40["final_median_multiple"])} is the reserve that protects extra years, late-life care, and bad post-year-30 returns. It is also the median of a right-skewed equity terminal-wealth distribution.</p>
-          <p class="callout"><b>Conclusion:</b> this 10-year Treasury sleeve reduces ruin and floor-breach risk, but it does not reduce time below starting wealth. At 4%, stock-only already has {format_pct(flex4_stock["ruin_pct"])} ruin; 60/40 cuts that to {flex4_6040["ruin_count"]} path, while years below start rise from {format_shortfall(flex4_stock)} to {format_shortfall(flex4_6040)}. The average gap in a shortfall year is smaller with 40% bonds, but integrated target loss is still worse: {format_pct(bonds5_40["target_shortfall_integrated_loss_pct_target"])} versus {format_pct(bonds5_0["target_shortfall_integrated_loss_pct_target"])} for stock-only at the 5% target.</p>
+          <p class="callout"><b>Conclusion:</b> at a flexible 4% target, a permanent 40% Treasury sleeve mostly insures the extreme left tail. It changes average spending only modestly ({format_pct(spend_delivered(flex4_stock))} vs {format_pct(spend_delivered(flex4_6040))} of target spending delivered) while cutting median ending wealth from {format_x(flex4_stock["final_median_multiple"])} to {format_x(flex4_6040["final_median_multiple"])}. Whether taking ruin from {flex4_stock["ruin_count"]} paths to {flex4_6040["ruin_count"]} is worth that cushion is a preference, not a theorem.</p>
         </section>
         {followup_html}
         <section id="interpretation">
           <h2>Interpretation</h2>
-          <p>The traditional allocation argument says bonds reduce sequence risk. That is true, but incomplete. This spending rule already cuts discretionary spending before the portfolio is exhausted. Once that is true, the value of a permanent 10-year Treasury sleeve falls on the “years below start / median wealth” score this paper tracks.</p>
-          <blockquote>Under this flexible rule, extra permanent 10-year Treasuries buy a small cut in an already-small ruin rate and pay for it in years the real portfolio stays below its start.</blockquote>
-          <p>That is a scoped result, not a falsification of 60/40. The sample is US large-cap history from {start_year} to {end_year}. Bonds here are 10-year Treasury total returns. Withdrawals are year-end after annual returns. A household that values floor certainty, a smaller left tail, or not sitting through a 50% equity drawdown can still prefer a bond sleeve. {tips_sentence}</p>
+          <p>The traditional allocation argument says bonds reduce sequence risk. That is true, but incomplete. This spending rule already cuts discretionary spending before the portfolio is exhausted. In this sample the 60/40 lifestyle cost is mostly cosmetic: more years slightly below start, almost the same lifetime spending, and a much smaller terminal reserve.</p>
+          <blockquote>At a flexible 4% target, a permanent 40% Treasury sleeve mostly insures the extreme left tail. Average spending barely changes; the long-term wealth cushion is cut roughly in half.</blockquote>
+          <p>Beginning-of-year withdrawals are slightly harsher and do not overturn stock-only. That is a scoped result, not a falsification of 60/40. The sample is US large-cap history from {start_year} to {end_year}. Bonds here are 10-year Treasury total returns. A household that values floor certainty, a smaller left tail, or not sitting through a 50% equity drawdown can still prefer a bond sleeve. {tips_sentence}</p>
         </section>
 
         <section id="limits">
@@ -712,24 +794,23 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
               <h3>Important limitations</h3>
               <ul>
                 <li>Taxes and fees are ignored.</li>
-                <li>Returns are annual, not monthly. Withdrawals happen after annual returns.</li>
-                <li>Bonds are 10-year Treasury total returns, not TIPS or a ladder.</li>
-                <li>Crash withdrawals sell bonds before equity; that is not pro-rata 60/40.</li>
-                <li>Overlapping 5-year blocks overweight interior years and replay the same crises.</li>
+                <li>Returns are annual, not monthly.</li>
+                <li>Bonds are 10-year Treasury total returns, not a real TIPS curve or coupon ladder.</li>
+                <li>The ERP grid shifts only the mean US equity premium; it is not an international history.</li>
+                <li>Overlapping 5-year blocks overweight interior years.</li>
                 <li>No Social Security, pension, mortgage, or health shock modeling.</li>
-                <li>No international returns or haircut to the realized US equity premium.</li>
               </ul>
             </div>
             <div class="note-card">
-              <h3>Follow-up tests</h3>
+              <h3>Remaining tests</h3>
               <ul>
-                <li>TIPS or short-Treasury floor funding, equities for surplus.</li>
-                <li>Pro-rata spending from a balanced fund.</li>
-                <li>Beginning-of-year and monthly withdrawals.</li>
-                <li>35- and 40-year longevity horizons.</li>
-                <li>Lower equity-premium / developed-ex-US samples.</li>
-                <li>Circular or non-overlapping blocks.</li>
+                <li>Monthly withdrawals.</li>
+                <li>A real TIPS / laddered floor, not a 0% real proxy.</li>
+                <li>Developed ex-US / international return history.</li>
+                <li>Log-return ERP robustness and non-overlapping blocks.</li>
+                <li>Threshold or delayed rebalancing, so “sell bonds in crashes” can persist.</li>
                 <li>Social Security or a pension covering part of the floor.</li>
+                <li>Taxes and fees.</li>
               </ul>
             </div>
           </div>

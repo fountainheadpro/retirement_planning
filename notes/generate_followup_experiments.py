@@ -1,4 +1,4 @@
-"""Run the allocation-paper follow-up experiments (not 20k in CI)."""
+"""Run allocation-paper follow-up experiments (not 20k in CI)."""
 
 from __future__ import annotations
 
@@ -19,11 +19,24 @@ from simulator import (
     run_simulation,
     tips_proxy_returns,
 )
-from strategies import ConservativeStrategy, ProRataBondStrategy
+from strategies import ConservativeStrategy, FloorFundingStrategy, ProRataBondStrategy
 
 SEED = 20260513
 BASE = 1_000_000
 FLOOR_RATIO = 0.5
+WEALTH_PERCENTILES = [1, 5, 10, 25, 50, 75, 90, 95, 99]
+ERP_LEVELS = [1.0, 0.75, 0.5, 0.25, 0.0]
+BOND_PCTS = [0.0, 0.2, 0.4, 0.6]
+FLOOR_YEARS = [10, 20, 25]
+
+
+def wealth_percentiles(final_wealth: object, initial_wealth: float = BASE) -> dict[str, float]:
+    import numpy as np
+
+    multiples = np.asarray(final_wealth, dtype=float) / initial_wealth
+    return {
+        f"p{int(p)}": float(np.percentile(multiples, p)) for p in WEALTH_PERCENTILES
+    }
 
 
 def run_case(
@@ -78,24 +91,28 @@ def run_case(
             "bond_pct": bond_pct,
             "years": years,
             "n_paths": n_paths,
+            "wealth_percentiles": wealth_percentiles(results["portfolio_values"][-1]),
         }
     )
     return summary
 
 
-def build_followup_rows(n_paths: int = 200) -> list[dict]:
-    assets = get_stock_bond_data(history_years=75)
-    haircut_stock = apply_erp_haircut(
-        assets["stock_returns"], assets["tbill_returns"], 0.5
-    )
+def build_robustness_rows(assets: dict, n_paths: int) -> list[dict]:
     tips = tips_proxy_returns(assets["inflation_rates"])
     cases = [
         ("4% crash-sell-bonds 60/40", dict(spending_cap_pct=0.04, bond_pct=0.4, strategy=ConservativeStrategy())),
         ("4% pro-rata 60/40", dict(spending_cap_pct=0.04, bond_pct=0.4, strategy=ProRataBondStrategy())),
-        ("4% TIPS-floor proxy 50%", dict(spending_cap_pct=0.04, bond_pct=0.5, strategy=ConservativeStrategy(), bond_returns=tips)),
+        (
+            "50% zero-real safe sleeve (rebalanced)",
+            dict(
+                spending_cap_pct=0.04,
+                bond_pct=0.5,
+                strategy=ConservativeStrategy(),
+                bond_returns=tips,
+            ),
+        ),
         ("4% stock-only beginning-of-year", dict(spending_cap_pct=0.04, bond_pct=0.0, strategy=ConservativeStrategy(), withdraw_before_returns=True)),
         ("4% stock-only 40-year", dict(spending_cap_pct=0.04, bond_pct=0.0, strategy=ConservativeStrategy(), years=40)),
-        ("4% stock-only half ERP", dict(spending_cap_pct=0.04, bond_pct=0.0, strategy=ConservativeStrategy(), stock_returns=haircut_stock)),
         ("4% stock-only circular blocks", dict(spending_cap_pct=0.04, bond_pct=0.0, strategy=ConservativeStrategy(), block_mode="circular")),
     ]
     rows = []
@@ -107,6 +124,66 @@ def build_followup_rows(n_paths: int = 200) -> list[dict]:
     return rows
 
 
+def build_erp_grid(assets: dict, n_paths: int) -> list[dict]:
+    rows = []
+    for haircut in ERP_LEVELS:
+        stock = apply_erp_haircut(
+            assets["stock_returns"], assets["tbill_returns"], haircut
+        )
+        for bond_pct in BOND_PCTS:
+            row = run_case(
+                assets,
+                n_paths=n_paths,
+                years=30,
+                spending_cap_pct=0.04,
+                bond_pct=bond_pct,
+                strategy=ConservativeStrategy(),
+                stock_returns=stock,
+            )
+            row["label"] = f"ERP {haircut:.0%} / {bond_pct:.0%} bonds"
+            row["erp_kept"] = haircut
+            rows.append(row)
+    return rows
+
+
+def build_floor_rows(assets: dict, n_paths: int) -> list[dict]:
+    tips = tips_proxy_returns(assets["inflation_rates"])
+    rows = []
+    for years_of_floor in FLOOR_YEARS:
+        bond_pct = years_of_floor * 0.04 * FLOOR_RATIO
+        row = run_case(
+            assets,
+            n_paths=n_paths,
+            years=30,
+            spending_cap_pct=0.04,
+            bond_pct=bond_pct,
+            strategy=FloorFundingStrategy(),
+            bond_returns=tips,
+        )
+        row["label"] = f"4% run-down floor bucket ({years_of_floor}y)"
+        row["floor_years"] = years_of_floor
+        rows.append(row)
+    return rows
+
+
+def build_followup_rows(n_paths: int = 200) -> list[dict]:
+    """Backward-compatible robustness rows used by existing tests."""
+    assets = get_stock_bond_data(history_years=75)
+    return build_robustness_rows(assets, n_paths)
+
+
+def build_followup_payload(n_paths: int = 200) -> dict:
+    assets = get_stock_bond_data(history_years=75)
+    rows = build_robustness_rows(assets, n_paths)
+    return {
+        "n_paths": n_paths,
+        "seed": SEED,
+        "rows": rows,
+        "erp_grid": build_erp_grid(assets, n_paths),
+        "floor_rows": build_floor_rows(assets, n_paths),
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--n-paths", type=int, default=200)
@@ -116,10 +193,17 @@ def main() -> None:
         default=ROOT / "notes" / "assets" / "followup_results.json",
     )
     args = parser.parse_args()
-    rows = build_followup_rows(n_paths=args.n_paths)
+    payload = build_followup_payload(n_paths=args.n_paths)
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps({"n_paths": args.n_paths, "seed": SEED, "rows": rows}, indent=2) + "\n")
-    print(f"Wrote {args.out} ({len(rows)} rows, {args.n_paths} paths)")
+    args.out.write_text(json.dumps(payload, indent=2) + "\n")
+    docs_copy = ROOT / "docs" / "assets" / "followup_results.json"
+    docs_copy.parent.mkdir(parents=True, exist_ok=True)
+    docs_copy.write_text(json.dumps(payload, indent=2) + "\n")
+    print(
+        f"Wrote {args.out} "
+        f"({len(payload['rows'])} robustness, {len(payload['erp_grid'])} ERP, "
+        f"{len(payload['floor_rows'])} floor; {args.n_paths} paths)"
+    )
 
 
 if __name__ == "__main__":

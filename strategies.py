@@ -16,6 +16,7 @@ class StrategyContext:
     # Configuration
     target_cash_level: float  # For replenishment targets
     bond_allocation_pct: float = 0.0
+    floor_spend: float = 0.0
 
 def apply_cash_equity_transfer(
     cash: np.ndarray,
@@ -279,3 +280,33 @@ class ProRataBondStrategy(ConservativeStrategy):
         remaining = remaining - from_equity - from_bonds
         from_cash = np.minimum(remaining, ctx.current_cash)
         return from_cash, from_bonds, from_equity
+
+
+class FloorFundingStrategy(CashStrategy):
+    """Pay the floor from a 0% real bucket that is allowed to run down.
+
+    The initial sleeve size is set by bond_allocation_pct. This strategy does
+    not rebalance that sleeve back to a percent of remaining wealth.
+    """
+
+    def pre_withdrawal_rebalance(self, ctx: StrategyContext) -> np.ndarray:
+        return np.zeros_like(ctx.current_cash)
+
+    def determine_withdrawal_source(
+        self, ctx: StrategyContext
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        n_paths = len(ctx.current_cash)
+        remaining = ctx.desired_withdrawal.copy()
+        floor_need = np.minimum(remaining, float(ctx.floor_spend)) if ctx.floor_spend > 0 else remaining
+        from_bonds = np.minimum(floor_need, ctx.current_bonds)
+        remaining = remaining - from_bonds
+        from_equity = np.minimum(remaining, ctx.current_equity)
+        remaining = remaining - from_equity
+        leftover = np.minimum(remaining, ctx.current_bonds - from_bonds)
+        from_bonds = from_bonds + leftover
+        remaining = remaining - leftover
+        from_cash = np.minimum(remaining, ctx.current_cash)
+        return from_cash, from_bonds, from_equity
+
+    def post_withdrawal_rebalance(self, ctx: StrategyContext) -> np.ndarray:
+        return np.zeros_like(ctx.current_cash)

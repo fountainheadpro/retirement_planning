@@ -71,6 +71,7 @@ def summarize_withdrawals(
         "target_shortfall_avg_depth_pct_target": avg_shortfall_depth_pct_target,
         "target_shortfall_integrated_loss_pct_target": float(np.mean(shortfall_loss) * 100),
         "target_shortfall_integrated_loss_years": float(np.mean(shortfall_loss.sum(axis=0))),
+        "target_spend_delivered_pct": float((1.0 - np.mean(shortfall_loss)) * 100),
         "floor_breach_pct": path_period_rate(floor_mask),
         "floor_breach_path_years": int(np.sum(floor_mask)),
         "floor_breach_ever_pct": float(np.mean(np.any(floor_mask, axis=0)) * 100),

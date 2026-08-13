@@ -111,7 +111,7 @@
       <div>
         <p class="eyebrow">Retirement Planning Report · May 14, 2026</p>
         <h1>The Measurable Tradeoffs Behind The 4% Rule</h1>
-        <p class="dek">Under a flexible target/cap/floor rule, classic fixed 4% 60/40 ruin mostly disappears. Extra permanent 10-year Treasuries then buy little extra safety and more years below starting wealth.</p>
+        <p class="dek">At a flexible 4% target, a permanent 40% 10-year Treasury sleeve mostly insures the extreme left tail. Average spending barely changes; the long-term wealth cushion is cut roughly in half.</p>
       </div>
       <aside class="hero-panel">
         <img src="assets/bond_report_objective_tradeoff.png" alt="Objective tradeoff chart showing higher bond allocations moving toward more years below starting wealth and lower median wealth.">
@@ -147,7 +147,7 @@
         <a href="#withdrawal">3. Withdrawal Search</a>
         <a href="#block-size">4. Block Size</a>
         <a href="#bonds">5. Bonds</a>
-        <a href="#followup">6. Follow-up</a>
+        <a href="#followup">6. ERP And Floor</a>
         <a href="#interpretation">Interpretation</a>
         <a href="#limits">Limitations</a>
       </nav>
@@ -157,12 +157,12 @@
           <h2>Executive Summary</h2>
           <p class="lead">Imagine someone retiring with a portfolio of a few million dollars. Some spending is mandatory: food, basic housing, utilities, insurance, taxes, and health care. Other spending is discretionary: travel, nicer housing, gifts, upgrades, and the parts of life that make retirement feel abundant.</p>
           <p>That budget naturally creates two retirement objectives. The <b>target</b> is the preferred lifestyle. The <b>floor</b> is the minimum acceptable lifestyle. This report replaces labels like conservative and aggressive with measurable tradeoffs: ruin, years below starting wealth, floor-breach risk, shortfall depth, and real ending wealth.</p>
-          <p>The useful comparison is at one spending rate. Classic fixed-real 4% 60/40 has 4.50% ruin in this model — in the Trinity neighborhood. The same 4% target with a flexible cap/floor rule cuts stock-only ruin to 0.15%. Adding a permanent 40% 10-year Treasury sleeve then cuts ruin from 30 paths to 1 path, while years below starting wealth rise from 19.16% to 25.63% and real median ending wealth falls from 4.28x to 2.08x.</p>
+          <p>The useful comparison is at one spending rate. Classic fixed-real 4% 60/40 has 4.50% ruin in this model — numerically close to the historical failure rate associated with the original Trinity results, though the methodology differs (block bootstrap, 10-year Treasuries, and annual year-end withdrawals versus Trinity’s historical payout periods, corporate bonds, and monthly inflation-adjusted withdrawals). The same 4% target with a flexible cap/floor rule cuts stock-only ruin to 0.15%. Adding a permanent 40% 10-year Treasury sleeve then cuts ruin from 30 paths to 1 path. Years below starting wealth rise from 19.16% to 25.63%, but lifetime target spending delivered only moves from 95.22% to 94.80%. Real median ending wealth falls from 4.28x to 2.08x.</p>
           <div class="callout">
             <b>What the rule is doing:</b> when the target rate equals the cap rate, a target-shortfall year is a year the real portfolio is below its start. Stock-only “maintains lifestyle” here mostly because US equities in 1951–2025 spend fewer years underwater than a 10-year Treasury sleeve. A household that weights a funded floor or a smaller left tail more than median terminal wealth can still prefer bonds.
           </div>
-          <div class="table-wrap"><table><thead><tr><th>Benchmark</th><th>Spending rule</th><th>Bonds</th><th>Ruin</th><th>Years wealth below start</th><th>Ever miss target</th><th>Integrated target loss</th><th>Real final median</th></tr></thead><tbody><tr><td>4% stock-only</td><td>4% target / 2% floor, flexible</td><td>0%</td><td>&lt;0.2% (30 paths; 95% CI 0.11–0.21%)</td><td>19.16%</td><td>60.38%</td><td>4.78%</td><td>4.28x</td></tr><tr><td>4% 60/40</td><td>4% target / 2% floor, flexible</td><td>40%</td><td>&lt;0.2% (1 path; 95% CI 0.00–0.03%)</td><td>25.63%</td><td>64.84%</td><td>5.20%</td><td>2.08x</td></tr><tr><td>Classic fixed-real 4% 60/40</td><td>Fixed 4%, no spending flexibility</td><td>40%</td><td>4.50% (901 paths; 95% CI 4.23–4.80%)</td><td>0.76%</td><td>4.50%</td><td>0.68%</td><td>2.00x</td></tr><tr><td>5% stock-only</td><td>5% target / 2.5% floor, flexible</td><td>0%</td><td>0.98% (197 paths; 95% CI 0.86–1.13%)</td><td>24.41%</td><td>63.88%</td><td>6.67%</td><td>3.32x</td></tr><tr><td>5% 60/40</td><td>5% target / 2.5% floor, flexible</td><td>40%</td><td>0.21% (41 paths; 95% CI 0.15–0.28%)</td><td>35.46%</td><td>71.65%</td><td>8.43%</td><td>1.44x</td></tr></tbody></table></div>
-          <p>Flexible 4% stock-only still misses the target on 60.38% of paths. Integrated target loss, which weights depth rather than a binary miss, is 4.78% for stock-only versus 5.20% for 60/40. Ruin rates below 0.2% are shown as counts plus a 95% Wilson interval; one path in 20,000 is not a precise rate.</p>
+          <div class="table-wrap"><table><thead><tr><th>Benchmark</th><th>Spending rule</th><th>Bonds</th><th>Ruin</th><th>Years wealth below start</th><th>Ever miss target</th><th>Spend delivered</th><th>Integrated target loss</th><th>Real final median</th></tr></thead><tbody><tr><td>4% stock-only</td><td>4% target / 2% floor, flexible</td><td>0%</td><td>&lt;0.2% (30 paths; 95% CI 0.11–0.21%)</td><td>19.16%</td><td>60.38%</td><td>95.22%</td><td>4.78%</td><td>4.28x</td></tr><tr><td>4% 60/40</td><td>4% target / 2% floor, flexible</td><td>40%</td><td>&lt;0.2% (1 path; 95% CI 0.00–0.03%)</td><td>25.63%</td><td>64.84%</td><td>94.80%</td><td>5.20%</td><td>2.08x</td></tr><tr><td>Classic fixed-real 4% 60/40</td><td>Fixed 4%, no spending flexibility</td><td>40%</td><td>4.50% (901 paths; 95% CI 4.23–4.80%)</td><td>0.76%</td><td>4.50%</td><td>99.32%</td><td>0.68%</td><td>2.00x</td></tr><tr><td>5% stock-only</td><td>5% target / 2.5% floor, flexible</td><td>0%</td><td>0.98% (197 paths; 95% CI 0.86–1.13%)</td><td>24.41%</td><td>63.88%</td><td>93.33%</td><td>6.67%</td><td>3.32x</td></tr><tr><td>5% 60/40</td><td>5% target / 2.5% floor, flexible</td><td>40%</td><td>0.21% (41 paths; 95% CI 0.15–0.28%)</td><td>35.46%</td><td>71.65%</td><td>91.57%</td><td>8.43%</td><td>1.44x</td></tr></tbody></table></div>
+          <p>Flexible 4% stock-only still misses the target on 60.38% of paths. The binary “years below start” gap is large because 60/40 spends more years slightly underwater. Integrated target loss, the depth-weighted companion, is 4.78% versus 5.20% — that is 95.22% versus 94.80% of desired lifetime spending delivered. The main economic cost of 60/40 in this sample is the longevity cushion, not current lifestyle. Ruin rates below 0.2% are shown as counts plus a 95% Wilson interval; one path in 20,000 is not a precise rate.</p>
         </section>
 
         <section id="setup">
@@ -290,21 +290,34 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
             <figcaption>Both the 4% and 5% target cases show the same movement: more 10-year Treasuries mean more years below start and lower real median ending wealth.</figcaption>
           </figure>
           <p>Ending wealth is a longevity cushion. A 30-year simulation is a modeling horizon, not a known lifespan. The difference between ending with 3.32x and 1.44x is the reserve that protects extra years, late-life care, and bad post-year-30 returns. It is also the median of a right-skewed equity terminal-wealth distribution.</p>
-          <p class="callout"><b>Conclusion:</b> this 10-year Treasury sleeve reduces ruin and floor-breach risk, but it does not reduce time below starting wealth. At 4%, stock-only already has 0.15% ruin; 60/40 cuts that to 1 path, while years below start rise from 19.16% to 25.63%. The average gap in a shortfall year is smaller with 40% bonds, but integrated target loss is still worse: 8.43% versus 6.67% for stock-only at the 5% target.</p>
+          <p class="callout"><b>Conclusion:</b> at a flexible 4% target, a permanent 40% Treasury sleeve mostly insures the extreme left tail. It changes average spending only modestly (95.22% vs 94.80% of target spending delivered) while cutting median ending wealth from 4.28x to 2.08x. Whether taking ruin from 30 paths to 1 is worth that cushion is a preference, not a theorem.</p>
         </section>
         
         <section id="followup">
-          <h2>Experiment 6: Tests That Can Change The Conclusion</h2>
-          <p>These rows use the same seed family and 5-year blocks as the main tables, with 20,000 paths. They isolate one assumption at a time.</p>
-          <div class="table-wrap"><table><thead><tr><th>Experiment</th><th>Ruin</th><th>Years wealth below start</th><th>Ever miss</th><th>Integrated target loss</th><th>Real final p10</th><th>Real final median</th></tr></thead><tbody><tr><td>4% crash-sell-bonds 60/40</td><td>&lt;0.2% (1 path; 95% CI 0.00–0.03%)</td><td>25.63%</td><td>64.84%</td><td>5.20%</td><td>0.71x</td><td>2.08x</td></tr><tr><td>4% pro-rata 60/40</td><td>&lt;0.2% (1 path; 95% CI 0.00–0.03%)</td><td>25.63%</td><td>64.84%</td><td>5.20%</td><td>0.71x</td><td>2.08x</td></tr><tr><td>4% TIPS-floor proxy 50%</td><td>&lt;0.2% (0 paths; 95% CI 0.00–0.02%)</td><td>40.50%</td><td>77.72%</td><td>8.14%</td><td>0.56x</td><td>1.09x</td></tr><tr><td>4% stock-only beginning-of-year</td><td>&lt;0.2% (33 paths; 95% CI 0.12–0.23%)</td><td>21.22%</td><td>68.72%</td><td>5.32%</td><td>0.88x</td><td>4.03x</td></tr><tr><td>4% stock-only 40-year</td><td>0.69% (137 paths; 95% CI 0.58–0.81%)</td><td>16.72%</td><td>60.63%</td><td>4.42%</td><td>1.13x</td><td>8.06x</td></tr><tr><td>4% stock-only half ERP</td><td>&lt;0.2% (0 paths; 95% CI 0.00–0.02%)</td><td>35.89%</td><td>72.30%</td><td>7.29%</td><td>0.59x</td><td>1.26x</td></tr><tr><td>4% stock-only circular blocks</td><td>&lt;0.2% (34 paths; 95% CI 0.12–0.24%)</td><td>17.56%</td><td>57.92%</td><td>4.31%</td><td>1.00x</td><td>4.90x</td></tr></tbody></table></div>
-          <p class="callout"><b>Read:</b> Pro-rata 60/40 and crash-sell-bonds are close: 25.63% vs 25.63% years below start, 2.08x vs 2.08x median wealth. A 50% TIPS-floor proxy (0% real) spends 40.50% of years below start and ends at 1.09x. Halving the equity premium over T-bills is the result that can change the story: 35.89% years below start and 1.26x median wealth. Beginning-of-year withdrawals keep the same spending rule but apply the year’s return after the withdrawal: 0.17% ruin, 21.22% years below start.</p>
+          <h2>Experiment 6: When Bonds Become Worthwhile</h2>
+          <p>These rows use the same seed family and 5-year blocks as the main tables, with 20,000 paths. The equity-premium transform shifts only the <b>mean</b> excess return versus T-bills. Crash years stay crash years.</p>
+          <div class="table-wrap"><table><thead><tr><th>Kept mean ERP</th><th>0% bonds</th><th>20% bonds</th><th>40% bonds</th><th>60% bonds</th></tr></thead><tbody><tr><td>100%</td><td>95.22% spend / 4.28x / &lt;0.2% (30 paths; 95% CI 0.11–0.21%)</td><td>95.45% spend / 3.11x / &lt;0.2% (3 paths; 95% CI 0.01–0.04%)</td><td>94.80% spend / 2.08x / &lt;0.2% (1 path; 95% CI 0.00–0.03%)</td><td>92.20% spend / 1.26x / &lt;0.2% (1 path; 95% CI 0.00–0.03%)</td></tr><tr><td>75%</td><td>90.28% spend / 1.91x / 1.53% (306 paths; 95% CI 1.37–1.71%)</td><td>90.85% spend / 1.59x / 0.45% (90 paths; 95% CI 0.37–0.55%)</td><td>90.34% spend / 1.22x / &lt;0.2% (20 paths; 95% CI 0.06–0.15%)</td><td>87.99% spend / 0.89x / &lt;0.2% (10 paths; 95% CI 0.03–0.09%)</td></tr><tr><td>50%</td><td>82.74% spend / 0.83x / 6.12% (1225 paths; 95% CI 5.80–6.47%)</td><td>83.98% spend / 0.81x / 2.60% (520 paths; 95% CI 2.39–2.83%)</td><td>84.16% spend / 0.76x / 0.89% (177 paths; 95% CI 0.76–1.02%)</td><td>82.95% spend / 0.67x / 0.32% (63 paths; 95% CI 0.25–0.40%)</td></tr><tr><td>25%</td><td>73.23% spend / 0.37x / 17.82% (3563 paths; 95% CI 17.29–18.35%)</td><td>75.57% spend / 0.45x / 9.21% (1843 paths; 95% CI 8.82–9.62%)</td><td>77.00% spend / 0.50x / 3.64% (727 paths; 95% CI 3.38–3.90%)</td><td>77.58% spend / 0.51x / 1.31% (261 paths; 95% CI 1.16–1.47%)</td></tr><tr><td>0%</td><td>63.29% spend / 0.09x / 37.69% (7537 paths; 95% CI 37.02–38.36%)</td><td>66.95% spend / 0.19x / 23.50% (4700 paths; 95% CI 22.92–24.09%)</td><td>69.97% spend / 0.29x / 11.03% (2206 paths; 95% CI 10.60–11.47%)</td><td>72.41% spend / 0.37x / 3.94% (787 paths; 95% CI 3.67–4.21%)</td></tr></tbody></table></div>
+          
+          <figure class="figure">
+            <img src="assets/bond_report_erp_grid.png" alt="Spend delivered and median wealth versus bond allocation under several mean equity premiums.">
+            <figcaption>Mean equity premium is scaled; year-to-year excess-return sequencing is kept. Bond and T-bill series are not haircut.</figcaption>
+          </figure>
+          <figure class="figure">
+            <img src="assets/bond_report_terminal_cdf.png" alt="Terminal wealth CDF by bond allocation at the historical equity premium.">
+            <figcaption>At the historical premium, a 40% Treasury sleeve is above stock-only only in the far left tail, then sits below it.</figcaption>
+          </figure>
+
+          <h3>Robustness</h3>
+          <div class="table-wrap"><table><thead><tr><th>Experiment</th><th>Ruin</th><th>Years wealth below start</th><th>Spend delivered</th><th>Real final p10</th><th>Real final median</th></tr></thead><tbody><tr><td>4% crash-sell-bonds 60/40</td><td>&lt;0.2% (1 path; 95% CI 0.00–0.03%)</td><td>25.63%</td><td>94.80%</td><td>0.71x</td><td>2.08x</td></tr><tr><td>4% pro-rata 60/40</td><td>&lt;0.2% (1 path; 95% CI 0.00–0.03%)</td><td>25.63%</td><td>94.80%</td><td>0.71x</td><td>2.08x</td></tr><tr><td>50% zero-real safe sleeve (rebalanced)</td><td>&lt;0.2% (0 paths; 95% CI 0.00–0.02%)</td><td>40.50%</td><td>91.86%</td><td>0.56x</td><td>1.09x</td></tr><tr><td>4% stock-only beginning-of-year</td><td>&lt;0.2% (33 paths; 95% CI 0.12–0.23%)</td><td>21.22%</td><td>94.68%</td><td>0.88x</td><td>4.03x</td></tr><tr><td>4% stock-only 40-year</td><td>0.69% (137 paths; 95% CI 0.58–0.81%)</td><td>16.72%</td><td>95.58%</td><td>1.13x</td><td>8.06x</td></tr><tr><td>4% stock-only circular blocks</td><td>&lt;0.2% (34 paths; 95% CI 0.12–0.24%)</td><td>17.56%</td><td>95.69%</td><td>1.00x</td><td>4.90x</td></tr></tbody></table></div>
+          <h3>Run-down floor bucket</h3><div class="table-wrap"><table><thead><tr><th>Policy</th><th>Initial safe share</th><th>Ruin</th><th>Years wealth below start</th><th>Spend delivered</th><th>Real final median</th></tr></thead><tbody><tr><td>4% run-down floor bucket (10y)</td><td>20%</td><td>&lt;0.2% (20 paths; 95% CI 0.06–0.15%)</td><td>20.68%</td><td>95.14%</td><td>3.85x</td></tr><tr><td>4% run-down floor bucket (20y)</td><td>40%</td><td>&lt;0.2% (4 paths; 95% CI 0.01–0.05%)</td><td>26.35%</td><td>94.22%</td><td>2.83x</td></tr><tr><td>4% run-down floor bucket (25y)</td><td>50%</td><td>&lt;0.2% (2 paths; 95% CI 0.00–0.04%)</td><td>32.01%</td><td>93.09%</td><td>2.20x</td></tr></tbody></table></div>
+          <p class="callout"><b>Read:</b> Once the mean US premium is cut in half, 40% Treasuries beat stock-only on both tails and spending: 177 ruined paths versus 1225, and 84.16% versus 82.74% of target spending delivered. At the historical premium the ranking is the reverse on wealth (4.28x versus 2.08x) while spending stays close. Under annual rebalancing and frictionless trading, withdrawal source does not explain the 60/40 result. Crash-sell-bonds and pro-rata restore the same bond share after the withdrawal, so the rows are identical. The rebalanced 50% zero-real sleeve spends 40.50% of years below start and ends at 1.09x. That is the cost of keeping half the portfolio in a 0% real asset, not of matching a floor liability. Beginning-of-year withdrawals are slightly harsher (0.17% ruin, 21.22% years below start, 4.03x median) and do not overturn stock-only.</p>
         </section>
 
         <section id="interpretation">
           <h2>Interpretation</h2>
-          <p>The traditional allocation argument says bonds reduce sequence risk. That is true, but incomplete. This spending rule already cuts discretionary spending before the portfolio is exhausted. Once that is true, the value of a permanent 10-year Treasury sleeve falls on the “years below start / median wealth” score this paper tracks.</p>
-          <blockquote>Under this flexible rule, extra permanent 10-year Treasuries buy a small cut in an already-small ruin rate and pay for it in years the real portfolio stays below its start.</blockquote>
-          <p>That is a scoped result, not a falsification of 60/40. The sample is US large-cap history from 1951 to 2025. Bonds here are 10-year Treasury total returns. Withdrawals are year-end after annual returns. A household that values floor certainty, a smaller left tail, or not sitting through a 50% equity drawdown can still prefer a bond sleeve. A TIPS-floor proxy and a halved equity premium are in Experiment 6; they are the cases most likely to change how much stock-only ‘lifestyle reliability’ is just the realized US premium.</p>
+          <p>The traditional allocation argument says bonds reduce sequence risk. That is true, but incomplete. This spending rule already cuts discretionary spending before the portfolio is exhausted. In this sample the 60/40 lifestyle cost is mostly cosmetic: more years slightly below start, almost the same lifetime spending, and a much smaller terminal reserve.</p>
+          <blockquote>At a flexible 4% target, a permanent 40% Treasury sleeve mostly insures the extreme left tail. Average spending barely changes; the long-term wealth cushion is cut roughly in half.</blockquote>
+          <p>Beginning-of-year withdrawals are slightly harsher and do not overturn stock-only. That is a scoped result, not a falsification of 60/40. The sample is US large-cap history from 1951 to 2025. Bonds here are 10-year Treasury total returns. A household that values floor certainty, a smaller left tail, or not sitting through a 50% equity drawdown can still prefer a bond sleeve. A run-down 0% real floor bucket and a mean-only ERP grid are in Experiment 6. They separate “stocks did well in this sample” from “a permanent Treasury sleeve is the right insurance.”</p>
         </section>
 
         <section id="limits">
@@ -314,28 +327,27 @@ withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
               <h3>Important limitations</h3>
               <ul>
                 <li>Taxes and fees are ignored.</li>
-                <li>Returns are annual, not monthly. Withdrawals happen after annual returns.</li>
-                <li>Bonds are 10-year Treasury total returns, not TIPS or a ladder.</li>
-                <li>Crash withdrawals sell bonds before equity; that is not pro-rata 60/40.</li>
-                <li>Overlapping 5-year blocks overweight interior years and replay the same crises.</li>
+                <li>Returns are annual, not monthly.</li>
+                <li>Bonds are 10-year Treasury total returns, not a real TIPS curve or coupon ladder.</li>
+                <li>The ERP grid shifts only the mean US equity premium; it is not an international history.</li>
+                <li>Overlapping 5-year blocks overweight interior years.</li>
                 <li>No Social Security, pension, mortgage, or health shock modeling.</li>
-                <li>No international returns or haircut to the realized US equity premium.</li>
               </ul>
             </div>
             <div class="note-card">
-              <h3>Follow-up tests</h3>
+              <h3>Remaining tests</h3>
               <ul>
-                <li>TIPS or short-Treasury floor funding, equities for surplus.</li>
-                <li>Pro-rata spending from a balanced fund.</li>
-                <li>Beginning-of-year and monthly withdrawals.</li>
-                <li>35- and 40-year longevity horizons.</li>
-                <li>Lower equity-premium / developed-ex-US samples.</li>
-                <li>Circular or non-overlapping blocks.</li>
+                <li>Monthly withdrawals.</li>
+                <li>A real TIPS / laddered floor, not a 0% real proxy.</li>
+                <li>Developed ex-US / international return history.</li>
+                <li>Log-return ERP robustness and non-overlapping blocks.</li>
+                <li>Threshold or delayed rebalancing, so “sell bonds in crashes” can persist.</li>
                 <li>Social Security or a pension covering part of the floor.</li>
+                <li>Taxes and fees.</li>
               </ul>
             </div>
           </div>
-          <p>The result should be framed narrowly: under this specific flexible spending rule, with annual returns, sampled historical CPI inflation, and a permanent 10-year Treasury sleeve, extra defensive allocation did not improve the selected “years below start plus median wealth” score. Several items that used to be future work are now in Experiment 6: TIPS-floor proxy, pro-rata 60/40, beginning-of-year withdrawals, a 40-year horizon, a 50% equity-premium haircut, and circular blocks.</p>
+          <p>The result should be framed narrowly: under this specific flexible spending rule, with annual returns, sampled historical CPI inflation, and a permanent 10-year Treasury sleeve, extra defensive allocation did not improve the selected “years below start plus median wealth” score. Experiment 6 now includes a mean-only ERP × allocation grid, a run-down 0% real floor bucket, beginning-of-year withdrawals, a 40-year horizon, and circular blocks.</p>
           <p>A sibling monthly report, <a href="credit-line.html">Can A Hybrid Credit Line Reduce Forced Selling?</a>, tests a cap-respecting credit line on S&amp;P 500 total-return data from 1988 onward. Those ruin and shortfall rates are not comparable to the annual tables above.</p>
           <footer>Generated from <code>docs/assets/bond_report_results.json</code>, seed 20260513, 20,000 paths. Regenerating the HTML does not rerun the Monte Carlo.</footer>
         </section>

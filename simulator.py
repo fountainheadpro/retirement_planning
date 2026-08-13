@@ -62,10 +62,18 @@ def apply_erp_haircut(
     reference_returns: np.ndarray,
     haircut: float,
 ) -> np.ndarray:
-    """Scale excess stock return versus a reference series (usually T-bills)."""
+    """Keep excess-return sequence and volatility; scale only the mean premium.
+
+    e_t = r_stock - r_bill
+    e'_t = (e_t - mean(e)) + haircut * mean(e)
+    r'_stock = r_bill + e'_t
+    """
     stock = np.asarray(stock_returns, dtype=float)
     reference = np.asarray(reference_returns, dtype=float)
-    return reference + float(haircut) * (stock - reference)
+    excess = stock - reference
+    mean_excess = float(np.mean(excess))
+    adjusted = (excess - mean_excess) + float(haircut) * mean_excess
+    return reference + adjusted
 
 
 def tips_proxy_returns(inflation_rates: np.ndarray) -> np.ndarray:
@@ -542,6 +550,7 @@ def run_simulation(
             market_peak=market_peak,
             target_cash_level=target_cash_level,
             bond_allocation_pct=bond_allocation_pct,
+            floor_spend=float(minimum_annual_spend),
         )
         pre_transfer = strategy.pre_withdrawal_rebalance(ctx)
         current_cash, current_equity, _ = apply_cash_equity_transfer(
