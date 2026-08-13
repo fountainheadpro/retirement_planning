@@ -32,6 +32,8 @@ def test_allocation_html_matches_json_headlines():
     assert gen.format_x(flex4_stock["final_median_multiple"]) in html
     assert gen.format_pct(flex4_stock["target_shortfall_ever_pct"]) in html
     assert gen.format_ruin(flex4_6040, n_paths) in html
+    assert "probability of ruin" in html
+    assert "30 paths" not in html
     assert "years real wealth below start" in html
     assert "docs/assets/bond_report_results.json" in html
     assert 'href="credit-line.html"' in html

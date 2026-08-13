@@ -748,6 +748,59 @@ def plot_erp_grid(followup: dict) -> None:
     save(fig, "bond_report_erp_grid.png")
 
 
+def _spend_delivered(row: dict) -> float:
+    if "target_spend_delivered_pct" in row:
+        return float(row["target_spend_delivered_pct"])
+    return 100.0 - float(row["target_shortfall_integrated_loss_pct_target"])
+
+
+def plot_insurance_frontier(followup: dict) -> None:
+    """Median wealth vs ruin probability for stock-only, Treasuries, and floor buckets."""
+    points = []
+    grid = followup.get("erp_grid") or []
+    historical = {
+        round(row.get("bond_pct", -1), 4): row
+        for row in grid
+        if abs(row.get("erp_kept", -1) - 1.0) < 1e-9
+    }
+    for bond_pct, label in ((0.0, "Stock-only"), (0.2, "Permanent 20% Treasuries"), (0.4, "Permanent 40% Treasuries")):
+        row = historical.get(bond_pct)
+        if row:
+            points.append((label, row, COLORS["wealth"] if bond_pct == 0 else COLORS["accent"]))
+    for row in followup.get("floor_rows") or []:
+        years = int(row.get("floor_years", 0))
+        color = {10: COLORS["floor"], 20: COLORS["ink"], 25: COLORS["target"]}.get(years, COLORS["muted"])
+        points.append((f"{years}-year floor bucket", row, color))
+    if len(points) < 2:
+        return
+
+    fig, ax = plt.subplots(figsize=(9.8, 6.4))
+    title_block(
+        fig,
+        "How Much Wealth For Each Increment Of Insurance?",
+        "4% flexible target. Left is safer; higher is richer. Marker size is lifetime spending delivered.",
+    )
+    xs = [row["ruin_pct"] for _, row, _ in points]
+    ys = [row["final_median_multiple"] for _, row, _ in points]
+    delivered = [_spend_delivered(row) for _, row, _ in points]
+    sizes = [180 + (d - min(delivered)) / max(max(delivered) - min(delivered), 0.01) * 420 for d in delivered]
+    for (label, row, color), x, y, size, d in zip(points, xs, ys, sizes, delivered):
+        ax.scatter([x], [y], s=size, color=color, edgecolor="white", linewidth=1.4, zorder=3)
+        ax.annotate(
+            f"{label}\n{d:.1f}% spend",
+            xy=(x, y),
+            xytext=(8, 6),
+            textcoords="offset points",
+            fontsize=8.6,
+            color=COLORS["ink"],
+        )
+    ax.set_xlabel("Probability of ruin (%)")
+    ax.set_ylabel("Real median ending wealth (x)")
+    style_axis(ax, grid_axis="both")
+    fig.subplots_adjust(top=0.82, left=0.1, right=0.96, bottom=0.13)
+    save(fig, "bond_report_insurance_frontier.png")
+
+
 def plot_terminal_wealth_cdf(followup: dict) -> None:
     grid = followup.get("erp_grid") or []
     historical = [
@@ -802,6 +855,7 @@ def main() -> None:
     if followup:
         plot_erp_grid(followup)
         plot_terminal_wealth_cdf(followup)
+        plot_insurance_frontier(followup)
 
 
 if __name__ == "__main__":
