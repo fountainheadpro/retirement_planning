@@ -1,168 +1,346 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Can a Hybrid Credit Line Replace Cash and Bonds?</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Measurable Tradeoffs Behind The 4% Rule</title>
+  <meta name="description" content="A retirement allocation report stress-testing 60/40 and the 4% rule against mandatory and discretionary spending needs.">
+  <meta property="og:title" content="The Measurable Tradeoffs Behind The 4% Rule">
+  <meta property="og:description" content="Under a flexible target/cap/floor rule, classic 4% 60/40 ruin mostly disappears; extra permanent bonds then buy little extra safety and more years below starting wealth.">
+  <meta property="og:type" content="article">
+  <meta property="og:image" content="assets/bond_report_objective_tradeoff.png">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600&amp;display=swap');
-    
+    @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,650;8..60,750&display=swap");
     :root {
-      --bg: #0f1116;
-      --text: #e6e6e6;
-      --accent: #3b82f6;
+      --paper: #fbfaf5; --panel: #ffffff; --ink: #16212c; --muted: #697381;
+      --line: #d8dedf; --soft: #f0eee5; --red: #b23a48; --green: #2f7d64;
+      --blue: #274c77; --gold: #d2872c; --shadow: 0 24px 70px rgba(22, 33, 44, 0.12); --radius: 6px;
     }
-    
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
     body {
       margin: 0;
-      font-family: 'Inter', system_ui, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.6;
+      background:
+        linear-gradient(90deg, rgba(22, 33, 44, 0.035) 1px, transparent 1px) 0 0 / 44px 44px,
+        linear-gradient(180deg, #f7f3e9 0%, var(--paper) 36%, #f4f0e6 100%);
+      color: var(--ink);
+      font-family: "IBM Plex Sans", ui-sans-serif, sans-serif;
+      line-height: 1.58;
     }
-    
-    .container {
-      max-width: 720px;
-      margin: 0 auto;
-      padding: 4rem 1.5rem;
+    a { color: var(--blue); text-decoration-color: rgba(39, 76, 119, 0.35); text-underline-offset: 3px; }
+    .page { max-width: 1180px; margin: 0 auto; padding: 0 24px 72px; }
+    .site-nav { border-bottom: 1px solid var(--line); background: rgba(251, 250, 245, 0.92); backdrop-filter: blur(12px); }
+    .site-nav-inner { max-width: 1180px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .site-nav-brand { color: var(--ink); font-weight: 600; text-decoration: none; letter-spacing: 0.02em; }
+    .site-nav-links { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+    .site-nav a { color: #344250; text-decoration: none; font-size: 0.92rem; }
+    .site-nav a:hover, .site-nav a[aria-current="page"] { color: var(--red); }
+    .site-nav a[aria-current="page"] { font-weight: 600; }
+    .hero { min-height: 78vh; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr); gap: 52px; align-items: center; padding: 56px 0 42px; }
+    .eyebrow { color: var(--red); font-size: 0.76rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; margin: 0 0 18px; }
+    h1, h2, h3 { font-family: "Source Serif 4", Georgia, serif; line-height: 1.03; letter-spacing: 0; margin: 0; }
+    h1 { font-size: clamp(3rem, 8vw, 7.4rem); max-width: 900px; }
+    h2 { font-size: clamp(2.1rem, 4vw, 4.5rem); margin-bottom: 20px; }
+    h3 { font-size: clamp(1.45rem, 2vw, 2.2rem); margin: 20px 0 10px; }
+    .dek { font-size: clamp(1.15rem, 2vw, 1.55rem); max-width: 760px; color: #33414f; margin: 24px 0 0; }
+    .hero-panel { background: rgba(255, 255, 255, 0.78); border: 1px solid rgba(22, 33, 44, 0.12); border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px; backdrop-filter: blur(18px); }
+    .hero-panel img { width: 100%; display: block; border-radius: var(--radius); border: 1px solid var(--line); background: white; }
+    .caption { color: var(--muted); font-size: 0.92rem; margin: 12px 0 0; }
+    .metric-strip { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin: 20px 0 44px; background: rgba(255, 255, 255, 0.55); }
+    .metric { padding: 22px 18px; border-right: 1px solid var(--line); }
+    .metric:last-child { border-right: 0; }
+    .metric strong { display: block; font-family: "Source Serif 4", Georgia, serif; font-size: clamp(1.7rem, 3vw, 3rem); line-height: 1; margin-bottom: 8px; }
+    .metric span { color: var(--muted); font-size: 0.92rem; }
+    .layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 44px; align-items: start; }
+    nav.toc { position: sticky; top: 18px; padding: 18px 0; border-top: 2px solid var(--ink); }
+    nav.toc a { display: block; padding: 8px 0; color: #344250; text-decoration: none; font-size: 0.95rem; border-bottom: 1px solid rgba(22, 33, 44, 0.1); }
+    nav.toc a:hover { color: var(--red); }
+    main { min-width: 0; }
+    section { padding: 58px 0; border-top: 1px solid var(--line); }
+    section:first-child { border-top: 0; padding-top: 0; }
+    .lead { font-size: 1.17rem; color: #2e3c49; max-width: 860px; }
+    .callout { background: #fff8ea; border-left: 5px solid var(--gold); padding: 18px 20px; border-radius: var(--radius); margin: 24px 0; }
+    .formula { background: #16212c; color: #f7f3e9; border-radius: var(--radius); padding: 20px; overflow-x: auto; font: 500 0.96rem/1.7 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .figure { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 14px 40px rgba(22, 33, 44, 0.08); padding: 14px; margin: 28px 0; }
+    .figure img { width: 100%; display: block; border-radius: 4px; }
+    .figure figcaption { color: var(--muted); font-size: 0.95rem; padding: 10px 4px 2px; }
+    .grid-two { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin: 22px 0; }
+    .story-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 22px; margin: 26px 0; }
+    .note-card { background: rgba(255, 255, 255, 0.72); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+    .note-card .label { color: var(--muted); display: block; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; margin-bottom: 8px; text-transform: uppercase; }
+    .table-wrap { overflow-x: auto; margin: 22px 0 30px; border: 1px solid var(--line); border-radius: var(--radius); background: white; }
+    table { width: 100%; border-collapse: collapse; min-width: 720px; font-size: 0.95rem; }
+    th, td { padding: 11px 13px; text-align: right; border-bottom: 1px solid #e9edee; white-space: nowrap; }
+    th:first-child, td:first-child { text-align: left; font-weight: 600; }
+    th { background: #f0f3ef; color: #32404d; font-size: 0.79rem; letter-spacing: 0.06em; text-transform: uppercase; }
+    tr:last-child td { border-bottom: 0; }
+    blockquote { margin: 34px 0; padding: 4px 0 4px 24px; border-left: 5px solid var(--red); font-family: "Source Serif 4", Georgia, serif; font-size: clamp(1.35rem, 2.2vw, 2rem); line-height: 1.22; }
+    ul, ol { padding-left: 22px; }
+    li { margin: 7px 0; }
+    footer { color: var(--muted); border-top: 1px solid var(--line); padding-top: 28px; margin-top: 40px; font-size: 0.95rem; }
+    @media (max-width: 920px) {
+      .hero, .layout, .grid-two, .story-grid { grid-template-columns: 1fr; }
+      .hero { min-height: auto; }
+      nav.toc { position: static; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 18px; }
+      .metric-strip { grid-template-columns: repeat(2, 1fr); }
     }
-    
-    header {
-      text-align: center;
-      margin-bottom: 3rem;
-    }
-    
-    .title {
-      font-family: 'Space Grotesk', system_ui, sans-serif;
-      font-size: 2.25rem;
-      font-weight: 600;
-      line-height: 1.1;
-      margin: 0 0 1rem;
-    }
-    
-    .subtitle {
-      font-size: 1.125rem;
-      color: #a3a3a3;
-      max-width: 520px;
-      margin: 0 auto;
-    }
-    
-    .report-card {
-      background: #1a1d24;
-      border: 1px solid #2a2d35;
-      border-radius: 16px;
-      padding: 2rem;
-      margin-bottom: 2.5rem;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    
-    .report-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-    }
-    
-    .report-title {
-      font-size: 1.5rem;
-      font-weight: 600;
-      margin: 0 0 0.75rem;
-      color: white;
-    }
-    
-    .report-description {
-      color: #c2c2c2;
-      margin-bottom: 1.5rem;
-    }
-    
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      background: var(--accent);
-      color: white;
-      text-decoration: none;
-      padding: 0.875rem 1.75rem;
-      border-radius: 9999px;
-      font-weight: 600;
-      font-size: 0.95rem;
-      transition: all 0.2s ease;
-    }
-    
-    .btn:hover {
-      background: #2563eb;
-      transform: translateY(-1px);
-    }
-    
-    .meta {
-      font-size: 0.875rem;
-      color: #888;
-      margin-top: 1rem;
-    }
-    
-    .links {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      margin-top: 2rem;
-    }
-    
-    .link {
-      color: #a3a3a3;
-      text-decoration: none;
-      font-size: 0.95rem;
-    }
-    
-    .link:hover {
-      color: white;
-      text-decoration: underline;
-    }
-    
-    footer {
-      text-align: center;
-      font-size: 0.8rem;
-      color: #666;
-      margin-top: 4rem;
+    @media (max-width: 560px) {
+      .page { padding: 0 16px 48px; }
+      .metric-strip { grid-template-columns: 1fr; }
+      .metric { border-right: 0; border-bottom: 1px solid var(--line); }
+      .metric:last-child { border-bottom: 0; }
+      nav.toc { grid-template-columns: 1fr; }
+      .site-nav-inner { padding: 12px 16px; flex-direction: column; align-items: flex-start; }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <h1 class="title">Can a Hybrid Credit Line<br>Replace Cash and Bonds?</h1>
-      <p class="subtitle">
-        A detailed monthly Monte Carlo analysis of securities-backed credit lines 
-        as a tactical retirement buffer that respects flexible spending rules.
-      </p>
+  <nav class="site-nav" aria-label="Site">
+    <div class="site-nav-inner">
+      <a class="site-nav-brand" href="index.html">Retirement Planning</a>
+      <div class="site-nav-links">
+        <a href="index.html" aria-current="page">Allocation report</a>
+        <a href="credit-line.html">Credit-line report</a>
+        <a href="https://github.com/actions-im/retirement_planning">GitHub</a>
+      </div>
+    </div>
+  </nav>
+  <div class="page">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Retirement Planning Report · May 14, 2026</p>
+        <h1>The Measurable Tradeoffs Behind The 4% Rule</h1>
+        <p class="dek">Under a flexible target/cap/floor rule, classic fixed 4% 60/40 ruin mostly disappears. Extra permanent 10-year Treasuries then buy little extra safety and more years below starting wealth.</p>
+      </div>
+      <aside class="hero-panel">
+        <img src="assets/bond_report_objective_tradeoff.png" alt="Objective tradeoff chart showing higher bond allocations moving toward more years below starting wealth and lower median wealth.">
+        <p class="caption">When the target rate equals the cap rate, “target shortfall” is the share of years real wealth is below start. Ruin and floor-breach reductions are in the tables.</p>
+      </aside>
     </header>
 
-    <div class="report-card">
-      <h2 class="report-title">The Credit-Line Report</h2>
-      <p class="report-description">
-        This report tests whether an asset-backed credit line can meaningfully reduce 
-        forced equity sales during drawdowns — but only when the retiree is already 
-        following a disciplined target/cap/floor spending rule.
-      </p>
-      
-      <a href="credit-line.html" class="btn">
-        Read the full report →
-      </a>
-      
-      <div class="meta">
-        Monthly S&amp;P 500 total return blocks • 20,000 paths • Explicit debt mechanics • 
-        Margin event analysis • 4% and 5% spending targets
+    <div class="metric-strip" aria-label="Key findings">
+      <div class="metric">
+        <strong>4.50%</strong>
+        <span>ruin for classic fixed-real 4% 60/40 (901 of 20,000 paths)</span>
+      </div>
+      <div class="metric">
+        <strong>0.15%</strong>
+        <span>ruin for flexible 4% stock-only (30 paths)</span>
+      </div>
+      <div class="metric">
+        <strong>25.63%</strong>
+        <span>years real wealth below start for flexible 4% 60/40</span>
+      </div>
+      <div class="metric">
+        <strong>4.28x</strong>
+        <span>real median ending wealth for flexible 4% stock-only</span>
       </div>
     </div>
 
-    <div class="links">
-      <a href="https://github.com/fountainheadpro/retirement_planning" class="link">→ View on GitHub</a>
-      <a href="https://github.com/fountainheadpro/retirement_planning" class="link">→ Interactive Simulator</a>
-      <a href="credit-line.html" class="link">→ Direct link to report</a>
-    </div>
+    <div class="layout">
+      <nav class="toc" aria-label="Report sections">
+        <a href="#summary">Summary</a>
+        <a href="#setup">Scenario</a>
+        <a href="#cash">1. Cash Buffer</a>
+        <a href="#history">2. History Window</a>
+        <a href="#withdrawal">3. Withdrawal Search</a>
+        <a href="#block-size">4. Block Size</a>
+        <a href="#bonds">5. Bonds</a>
+        <a href="#followup">6. Follow-up</a>
+        <a href="#interpretation">Interpretation</a>
+        <a href="#limits">Limitations</a>
+      </nav>
 
-    <footer>
-      Published research from the Retirement Planning Simulator project.<br>
-      All analysis uses historical block bootstrap methods with transparent assumptions.
-    </footer>
+      <main>
+        <section id="summary">
+          <h2>Executive Summary</h2>
+          <p class="lead">Imagine someone retiring with a portfolio of a few million dollars. Some spending is mandatory: food, basic housing, utilities, insurance, taxes, and health care. Other spending is discretionary: travel, nicer housing, gifts, upgrades, and the parts of life that make retirement feel abundant.</p>
+          <p>That budget naturally creates two retirement objectives. The <b>target</b> is the preferred lifestyle. The <b>floor</b> is the minimum acceptable lifestyle. This report replaces labels like conservative and aggressive with measurable tradeoffs: ruin, years below starting wealth, floor-breach risk, shortfall depth, and real ending wealth.</p>
+          <p>The useful comparison is at one spending rate. Classic fixed-real 4% 60/40 has 4.50% ruin in this model — in the Trinity neighborhood. The same 4% target with a flexible cap/floor rule cuts stock-only ruin to 0.15%. Adding a permanent 40% 10-year Treasury sleeve then cuts ruin from 30 paths to 1 path, while years below starting wealth rise from 19.16% to 25.63% and real median ending wealth falls from 4.28x to 2.08x.</p>
+          <div class="callout">
+            <b>What the rule is doing:</b> when the target rate equals the cap rate, a target-shortfall year is a year the real portfolio is below its start. Stock-only “maintains lifestyle” here mostly because US equities in 1951–2025 spend fewer years underwater than a 10-year Treasury sleeve. A household that weights a funded floor or a smaller left tail more than median terminal wealth can still prefer bonds.
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>Benchmark</th><th>Spending rule</th><th>Bonds</th><th>Ruin</th><th>Years wealth below start</th><th>Ever miss target</th><th>Integrated target loss</th><th>Real final median</th></tr></thead><tbody><tr><td>4% stock-only</td><td>4% target / 2% floor, flexible</td><td>0%</td><td>&lt;0.2% (30 paths; 95% CI 0.11–0.21%)</td><td>19.16%</td><td>60.38%</td><td>4.78%</td><td>4.28x</td></tr><tr><td>4% 60/40</td><td>4% target / 2% floor, flexible</td><td>40%</td><td>&lt;0.2% (1 path; 95% CI 0.00–0.03%)</td><td>25.63%</td><td>64.84%</td><td>5.20%</td><td>2.08x</td></tr><tr><td>Classic fixed-real 4% 60/40</td><td>Fixed 4%, no spending flexibility</td><td>40%</td><td>4.50% (901 paths; 95% CI 4.23–4.80%)</td><td>0.76%</td><td>4.50%</td><td>0.68%</td><td>2.00x</td></tr><tr><td>5% stock-only</td><td>5% target / 2.5% floor, flexible</td><td>0%</td><td>0.98% (197 paths; 95% CI 0.86–1.13%)</td><td>24.41%</td><td>63.88%</td><td>6.67%</td><td>3.32x</td></tr><tr><td>5% 60/40</td><td>5% target / 2.5% floor, flexible</td><td>40%</td><td>0.21% (41 paths; 95% CI 0.15–0.28%)</td><td>35.46%</td><td>71.65%</td><td>8.43%</td><td>1.44x</td></tr></tbody></table></div>
+          <p>Flexible 4% stock-only still misses the target on 60.38% of paths. Integrated target loss, which weights depth rather than a binary miss, is 4.78% for stock-only versus 5.20% for 60/40. Ruin rates below 0.2% are shown as counts plus a 95% Wilson interval; one path in 20,000 is not a precise rate.</p>
+        </section>
+
+        <section id="setup">
+          <h2>Scenario And Spending Rule</h2>
+          <div class="story-grid">
+            <div class="note-card">
+              <span class="label">Mandatory spending</span>
+              <p>Food, basic housing, utilities, insurance, taxes, health care, and other expenses that cannot be cut without changing the retiree's minimum acceptable life.</p>
+            </div>
+            <div class="note-card">
+              <span class="label">Discretionary spending</span>
+              <p>Vacations, nicer housing, upgrades, gifts, and other spending that can be reduced when markets are bad without immediately creating ruin.</p>
+            </div>
+          </div>
+          <p>The report converts that budget into percentage rules. Experiments 1–4 use a 5% target and 2.5% floor. Experiment 5 and the summary table also show the 4% target that matches the traditional withdrawal-rate baseline.</p>
+          <div class="table-wrap"><table><thead><tr><th>Portfolio</th><th>Target (5%)</th><th>Floor (2.5%)</th></tr></thead><tbody><tr><td>$2M</td><td>$100,000</td><td>$50,000</td></tr><tr><td>$3M</td><td>$150,000</td><td>$75,000</td></tr><tr><td>$4M</td><td>$200,000</td><td>$100,000</td></tr><tr><td>$5M</td><td>$250,000</td><td>$125,000</td></tr><tr><td>$6M</td><td>$300,000</td><td>$150,000</td></tr><tr><td>$10M</td><td>$500,000</td><td>$250,000</td></tr></tbody></table></div>
+          <p>For the 5% baseline, the withdrawal rule is:</p>
+          <pre class="formula">target = 5.0% of initial portfolio, inflation adjusted
+floor = 2.5% of initial portfolio, inflation adjusted
+cap = 5.0% of current portfolio after that year's market return
+
+withdrawal = min(current portfolio, max(floor, min(target, cap)))</pre>
+          <p>The floor can override the cap. If the remaining portfolio cannot fund the floor, the withdrawal is limited to the remaining portfolio, and that year is counted as a floor breach.</p>
+          <div class="note-card">
+            <h3>Metric definitions</h3>
+            <ul>
+              <li><b>Ruin</b> is the percent of simulated paths whose terminal wealth is at or below zero. Intervals are 95% Wilson intervals on that path count.</li>
+              <li><b>Target shortfall / years wealth below start</b> is the percent of all simulated path-years in which withdrawal is below the real target. When the target rate equals the cap rate, that event is exactly “real wealth after the year’s return is below the starting portfolio.”</li>
+              <li><b>Ever miss target</b> is the percent of paths with at least one shortfall year.</li>
+              <li><b>Integrated target loss</b> is the mean, over all path-years, of the shortfall as a fraction of target. It weights depth, not just a binary miss.</li>
+              <li><b>Floor breach</b> is the percent of path-years in which the portfolio cannot fund the real floor.</li>
+              <li><b>Real final p10 / median</b> is ending wealth in starting-year purchasing power, divided by starting wealth.</li>
+            </ul>
+          </div>
+          <figure class="figure">
+            <img src="assets/bond_report_spending_cap.png" alt="Spending rule chart showing floor breach, floor funded, target shortfall, and target funded regimes.">
+            <figcaption>The left threshold, 0.025x, means one year of floor spending remains.</figcaption>
+          </figure>
+          <h3>Model</h3>
+          <p>The engine is a historical block-bootstrap Monte Carlo. It generates 20,000 random 30-year retirement paths by sampling contiguous 5-year historical blocks with replacement, not independent normal draws. Seed 20260513.</p>
+          <figure class="figure">
+            <img src="assets/bond_report_bootstrap_method.png" alt="Diagram explaining historical block bootstrap sampling.">
+            <figcaption>The model samples actual 5-year historical regimes and chains them into 30-year retirement paths.</figcaption>
+          </figure>
+          <p>Each sampled calendar year keeps its observed stock return, bond return, T-bill return, and CPI inflation rate. That preserves local sequences such as crashes followed by recoveries, inflation clusters, and stock/bond/inflation co-movement. Interior years appear in more overlapping blocks than the sample endpoints.</p>
+          <p>The main lookback window is 1951–2025 from Aswath Damodaran’s annual return dataset, using the S&amp;P 500 total-return series with dividends reinvested. Inflation comes from <a href="https://fred.stlouisfed.org/series/CPIAUCNS">FRED CPI-U</a>, calculated December-to-December. Cash is a T-bill-like reserve sampled from the same year, not an assumed 0% real asset.</p>
+          <div class="note-card">
+            <h3>Annual chronology</h3>
+            <ol>
+              <li>Sample the next historical year from the current 5-year block.</li>
+              <li>Apply sampled stock, bond, and T-bill returns, then deflate by that year's CPI inflation.</li>
+              <li>Compute the spending cap from the post-return real portfolio value.</li>
+              <li>Withdraw at year-end under the target/cap/floor rule.</li>
+              <li>Replenish cash when the strategy calls for it, rebalance bonds annually, and record outcomes.</li>
+            </ol>
+          </div>
+          <p>Because the model deflates returns each year, all ending-wealth multiples are real, CPI-adjusted multiples of the starting portfolio.</p>
+        </section>
+
+        <section id="cash">
+          <h2>Experiment 1: Cash Buffer</h2>
+          <p>This experiment varies the cash buffer from 0 to 5 years of target spending on the 5% baseline, with the remaining portfolio in the Damodaran S&amp;P 500 total-return series.</p>
+          <div class="table-wrap"><table><thead><tr><th>Cash buffer</th><th>Ruin</th><th>Years wealth below start</th><th>Floor breach</th><th>Real final p10</th><th>Real final median</th></tr></thead><tbody><tr><td>0 years</td><td>0.98%</td><td>24.41%</td><td>0.14%</td><td>0.63x</td><td>3.32x</td></tr><tr><td>1 years</td><td>0.88%</td><td>24.94%</td><td>0.12%</td><td>0.61x</td><td>3.14x</td></tr><tr><td>2 years</td><td>0.79%</td><td>26.09%</td><td>0.10%</td><td>0.59x</td><td>2.87x</td></tr><tr><td>3 years</td><td>0.72%</td><td>27.67%</td><td>0.08%</td><td>0.55x</td><td>2.57x</td></tr><tr><td>5 years</td><td>0.57%</td><td>32.24%</td><td>0.05%</td><td>0.45x</td><td>1.94x</td></tr></tbody></table></div>
+          <figure class="figure">
+            <img src="assets/bond_report_cash_buffer.png" alt="Cash buffer tradeoff chart.">
+            <figcaption>The plot separates years below starting wealth from tiny ruin/floor probabilities so both sides of the tradeoff are visible.</figcaption>
+          </figure>
+          <p class="callout"><b>Conclusion:</b> T-bill cash slightly lowers ruin and floor-breach risk, but it is expensive. A 5-year buffer lowers ruin from 0.98% to 0.57%, while years below start rise from 24.41% to 32.24% and median ending wealth falls from 3.32x to 1.94x. The rest of the report uses zero cash as the baseline.</p>
+        </section>
+
+        <section id="history">
+          <h2>Experiment 2: Historical Window Sensitivity</h2>
+          <p>This experiment keeps the 5% target, 2.5% floor, and no cash buffer. It changes only the lookback window.</p>
+          <div class="table-wrap"><table><thead><tr><th>History window</th><th>Ruin</th><th>Years wealth below start</th><th>Floor breach</th><th>Real final p10</th><th>Real final median</th></tr></thead><tbody><tr><td>50 years (1976-2025)</td><td>0.28%</td><td>18.83%</td><td>0.04%</td><td>0.90x</td><td>4.55x</td></tr><tr><td>75 years (1951-2025)</td><td>0.98%</td><td>24.41%</td><td>0.14%</td><td>0.63x</td><td>3.32x</td></tr><tr><td>98 years (1928-2025)</td><td>2.37%</td><td>30.07%</td><td>0.45%</td><td>0.43x</td><td>2.65x</td></tr></tbody></table></div>
+          <figure class="figure">
+            <img src="assets/bond_report_history_sensitivity.png" alt="Historical window sensitivity chart.">
+            <figcaption>The Depression-inclusive 98-year case is a useful stress test, but it pulls in a different economic regime.</figcaption>
+          </figure>
+          <p class="callout"><b>Conclusion:</b> the 75-year window remains the main baseline because it keeps modern severe sequences, including the 1970s inflation problem, while excluding the Great Depression and World War II regime from the central case. The 98-year result should still be read as a legitimate stress test, not dismissed. All of these windows are still US large-cap history.</p>
+        </section>
+
+        <section id="withdrawal">
+          <h2>Experiment 3: Safe Withdrawal Search</h2>
+          <p>Zero cash, zero bonds. Target spending rates from 4% to 10% of the initial portfolio. The floor is always 50% of the target.</p>
+          <div class="table-wrap"><table><thead><tr><th>Target spending rate</th><th>Floor</th><th>Ruin</th><th>Years wealth below start</th><th>Floor breach</th><th>Real final p10</th><th>Real final median</th></tr></thead><tbody><tr><td>4%</td><td>2.0%</td><td>0.15%</td><td>19.16%</td><td>0.02%</td><td>0.90x</td><td>4.28x</td></tr><tr><td>5%</td><td>2.5%</td><td>0.98%</td><td>24.41%</td><td>0.14%</td><td>0.63x</td><td>3.32x</td></tr><tr><td>6%</td><td>3.0%</td><td>3.12%</td><td>30.50%</td><td>0.58%</td><td>0.39x</td><td>2.44x</td></tr><tr><td>7%</td><td>3.5%</td><td>7.21%</td><td>37.22%</td><td>1.58%</td><td>0.13x</td><td>1.61x</td></tr><tr><td>8%</td><td>4.0%</td><td>14.09%</td><td>44.87%</td><td>3.44%</td><td>0.00x</td><td>0.97x</td></tr><tr><td>9%</td><td>4.5%</td><td>23.28%</td><td>52.71%</td><td>6.29%</td><td>0.00x</td><td>0.61x</td></tr><tr><td>10%</td><td>5.0%</td><td>35.07%</td><td>60.26%</td><td>10.28%</td><td>0.00x</td><td>0.34x</td></tr></tbody></table></div>
+          <figure class="figure">
+            <img src="assets/bond_report_safe_withdrawal_search.png" alt="Safe withdrawal search chart.">
+            <figcaption>Zone labels are judgmental summaries based on rising ruin, floor breach, years below start, and declining real p10 wealth.</figcaption>
+          </figure>
+          <div class="table-wrap"><table><thead><tr><th>Target spending rate</th><th>Years wealth below start</th><th>Ever miss target</th><th>Median shortfall years if any</th><th>Avg shortfall-year spending</th><th>Avg target gap</th><th>Integrated target loss</th></tr></thead><tbody><tr><td>4%</td><td>19.16%</td><td>60.38%</td><td>6</td><td>3.00%</td><td>24.97%</td><td>4.78%</td></tr><tr><td>5%</td><td>24.41%</td><td>63.88%</td><td>9</td><td>3.63%</td><td>27.32%</td><td>6.67%</td></tr><tr><td>6%</td><td>30.50%</td><td>69.35%</td><td>11</td><td>4.19%</td><td>30.25%</td><td>9.23%</td></tr><tr><td>7%</td><td>37.22%</td><td>72.49%</td><td>16</td><td>4.64%</td><td>33.67%</td><td>12.53%</td></tr><tr><td>8%</td><td>44.87%</td><td>77.07%</td><td>20</td><td>5.02%</td><td>37.27%</td><td>16.72%</td></tr><tr><td>9%</td><td>52.71%</td><td>81.54%</td><td>23</td><td>5.29%</td><td>41.25%</td><td>21.74%</td></tr><tr><td>10%</td><td>60.26%</td><td>85.28%</td><td>25</td><td>5.44%</td><td>45.58%</td><td>27.47%</td></tr></tbody></table></div>
+          <p class="callout"><b>Conclusion:</b> the withdrawal rate is a risk choice, not a magic number. Both 4% and 5% have low ruin here, but 4% is much lower: 0.15% versus 0.98%. Even at 4%, 60.38% of paths go below starting wealth at least once. Above 6%, the plan starts depending too heavily on favorable sequences.</p>
+        </section>
+
+        <section id="block-size">
+          <h2>Experiment 4: Block Size Sensitivity</h2>
+          <p>5% target, 2.5% floor, zero cash, zero bonds, 75-year Damodaran history. Only the bootstrap block size changes.</p>
+          <div class="table-wrap"><table><thead><tr><th>Block size</th><th>Ruin</th><th>Years wealth below start</th><th>Floor breach</th><th>Real final p10</th><th>Real final median</th></tr></thead><tbody><tr><td>1 year</td><td>1.70%</td><td>23.29%</td><td>0.36%</td><td>0.64x</td><td>3.87x</td></tr><tr><td>3 years</td><td>1.14%</td><td>22.50%</td><td>0.23%</td><td>0.69x</td><td>3.55x</td></tr><tr><td>5 years</td><td>0.98%</td><td>24.41%</td><td>0.14%</td><td>0.63x</td><td>3.32x</td></tr><tr><td>10 years</td><td>2.20%</td><td>27.22%</td><td>0.32%</td><td>0.46x</td><td>2.96x</td></tr></tbody></table></div>
+          <p class="callout"><b>Conclusion:</b> block size is a modeling assumption, not something to optimize until it best fits the past. Very short blocks break historical sequencing; very long blocks replay old macro regimes too literally. A 5-year block is the working compromise.</p>
+        </section>
+
+        <section id="bonds">
+          <h2>Experiment 5: Bonds And 60/40</h2>
+          <p>Zero cash. The bond sleeve is Damodaran 10-year Treasury total returns, rebalanced annually, with crash withdrawals going cash → bonds → equity. That is a permanent duration sleeve, not TIPS, not a ladder, and not pro-rata spending from a balanced fund.</p>
+          <h3>4% Target / 2% Floor</h3>
+          <div class="table-wrap"><table><thead><tr><th>Bond allocation</th><th>Ruin</th><th>Years wealth below start</th><th>Floor breach</th><th>Real final p10</th><th>Real final median</th></tr></thead><tbody><tr><td>0% bonds</td><td>&lt;0.2% (30 paths; 95% CI 0.11–0.21%)</td><td>19.16%</td><td>0.02%</td><td>0.90x</td><td>4.28x</td></tr><tr><td>10% bonds</td><td>&lt;0.2% (10 paths; 95% CI 0.03–0.09%)</td><td>19.52%</td><td>0.00%</td><td>0.88x</td><td>3.68x</td></tr><tr><td>20% bonds</td><td>&lt;0.2% (3 paths; 95% CI 0.01–0.04%)</td><td>20.73%</td><td>0.00% (9 path-years)</td><td>0.84x</td><td>3.11x</td></tr><tr><td>40% bonds</td><td>&lt;0.2% (1 path; 95% CI 0.00–0.03%)</td><td>25.63%</td><td>0.00% (3 path-years)</td><td>0.71x</td><td>2.08x</td></tr><tr><td>60% bonds</td><td>&lt;0.2% (1 path; 95% CI 0.00–0.03%)</td><td>37.24%</td><td>0.00% (1 path-years)</td><td>0.56x</td><td>1.26x</td></tr></tbody></table></div>
+          <h3>5% Target / 2.5% Floor</h3>
+          <div class="table-wrap"><table><thead><tr><th>Bond allocation</th><th>Ruin</th><th>Years wealth below start</th><th>Floor breach</th><th>Real final p10</th><th>Real final median</th></tr></thead><tbody><tr><td>0% bonds</td><td>0.98%</td><td>24.41%</td><td>0.14%</td><td>0.63x</td><td>3.32x</td></tr><tr><td>10% bonds</td><td>0.65%</td><td>25.61%</td><td>0.08%</td><td>0.61x</td><td>2.80x</td></tr><tr><td>20% bonds</td><td>0.43%</td><td>27.64%</td><td>0.04%</td><td>0.59x</td><td>2.31x</td></tr><tr><td>40% bonds</td><td>0.21%</td><td>35.46%</td><td>0.02%</td><td>0.50x</td><td>1.44x</td></tr><tr><td>60% bonds</td><td>0.27%</td><td>51.07%</td><td>0.02%</td><td>0.38x</td><td>0.84x</td></tr></tbody></table></div>
+          <figure class="figure">
+            <img src="assets/bond_report_bond_allocation.png" alt="Bond allocation tradeoff chart.">
+            <figcaption>This plot shows the lifestyle/wealth cost side and the small ruin/floor-risk benefit of 10-year Treasuries on separate scales.</figcaption>
+          </figure>
+          <div class="grid-two">
+            <div class="note-card">
+              <h3>0% bonds</h3>
+              <p>24.41% of years below starting wealth and 3.32x median ending wealth.</p>
+            </div>
+            <div class="note-card">
+              <h3>60% bonds</h3>
+              <p>51.07% of years below starting wealth and 0.84x median ending wealth.</p>
+            </div>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>Bond allocation</th><th>Years wealth below start</th><th>Ever miss target</th><th>Median shortfall years if any</th><th>Avg shortfall-year spending</th><th>Avg target gap</th><th>Integrated target loss</th></tr></thead><tbody><tr><td>0% bonds</td><td>24.41%</td><td>63.88%</td><td>9</td><td>3.63%</td><td>27.32%</td><td>6.67%</td></tr><tr><td>10% bonds</td><td>25.61%</td><td>63.27%</td><td>10</td><td>3.70%</td><td>25.94%</td><td>6.64%</td></tr><tr><td>20% bonds</td><td>27.64%</td><td>67.12%</td><td>10</td><td>3.76%</td><td>24.82%</td><td>6.86%</td></tr><tr><td>40% bonds</td><td>35.46%</td><td>71.65%</td><td>14</td><td>3.81%</td><td>23.78%</td><td>8.43%</td></tr><tr><td>60% bonds</td><td>51.07%</td><td>84.02%</td><td>21</td><td>3.75%</td><td>24.97%</td><td>12.75%</td></tr></tbody></table></div>
+          <figure class="figure">
+            <img src="assets/bond_report_objective_tradeoff_4_5.png" alt="Objective tradeoff chart for 4% and 5% spending targets.">
+            <figcaption>Both the 4% and 5% target cases show the same movement: more 10-year Treasuries mean more years below start and lower real median ending wealth.</figcaption>
+          </figure>
+          <p>Ending wealth is a longevity cushion. A 30-year simulation is a modeling horizon, not a known lifespan. The difference between ending with 3.32x and 1.44x is the reserve that protects extra years, late-life care, and bad post-year-30 returns. It is also the median of a right-skewed equity terminal-wealth distribution.</p>
+          <p class="callout"><b>Conclusion:</b> this 10-year Treasury sleeve reduces ruin and floor-breach risk, but it does not reduce time below starting wealth. At 4%, stock-only already has 0.15% ruin; 60/40 cuts that to 1 path, while years below start rise from 19.16% to 25.63%. The average gap in a shortfall year is smaller with 40% bonds, but integrated target loss is still worse: 8.43% versus 6.67% for stock-only at the 5% target.</p>
+        </section>
+        
+        <section id="followup">
+          <h2>Experiment 6: Tests That Can Change The Conclusion</h2>
+          <p>These rows use the same seed family and 5-year blocks as the main tables, with 20,000 paths. They isolate one assumption at a time.</p>
+          <div class="table-wrap"><table><thead><tr><th>Experiment</th><th>Ruin</th><th>Years wealth below start</th><th>Ever miss</th><th>Integrated target loss</th><th>Real final p10</th><th>Real final median</th></tr></thead><tbody><tr><td>4% crash-sell-bonds 60/40</td><td>&lt;0.2% (1 path; 95% CI 0.00–0.03%)</td><td>25.63%</td><td>64.84%</td><td>5.20%</td><td>0.71x</td><td>2.08x</td></tr><tr><td>4% pro-rata 60/40</td><td>&lt;0.2% (1 path; 95% CI 0.00–0.03%)</td><td>25.63%</td><td>64.84%</td><td>5.20%</td><td>0.71x</td><td>2.08x</td></tr><tr><td>4% TIPS-floor proxy 50%</td><td>&lt;0.2% (0 paths; 95% CI 0.00–0.02%)</td><td>40.50%</td><td>77.72%</td><td>8.14%</td><td>0.56x</td><td>1.09x</td></tr><tr><td>4% stock-only beginning-of-year</td><td>&lt;0.2% (33 paths; 95% CI 0.12–0.23%)</td><td>21.22%</td><td>68.72%</td><td>5.32%</td><td>0.88x</td><td>4.03x</td></tr><tr><td>4% stock-only 40-year</td><td>0.69% (137 paths; 95% CI 0.58–0.81%)</td><td>16.72%</td><td>60.63%</td><td>4.42%</td><td>1.13x</td><td>8.06x</td></tr><tr><td>4% stock-only half ERP</td><td>&lt;0.2% (0 paths; 95% CI 0.00–0.02%)</td><td>35.89%</td><td>72.30%</td><td>7.29%</td><td>0.59x</td><td>1.26x</td></tr><tr><td>4% stock-only circular blocks</td><td>&lt;0.2% (34 paths; 95% CI 0.12–0.24%)</td><td>17.56%</td><td>57.92%</td><td>4.31%</td><td>1.00x</td><td>4.90x</td></tr></tbody></table></div>
+          <p class="callout"><b>Read:</b> Pro-rata 60/40 and crash-sell-bonds are close: 25.63% vs 25.63% years below start, 2.08x vs 2.08x median wealth. A 50% TIPS-floor proxy (0% real) spends 40.50% of years below start and ends at 1.09x. Halving the equity premium over T-bills is the result that can change the story: 35.89% years below start and 1.26x median wealth. Beginning-of-year withdrawals keep the same spending rule but apply the year’s return after the withdrawal: 0.17% ruin, 21.22% years below start.</p>
+        </section>
+
+        <section id="interpretation">
+          <h2>Interpretation</h2>
+          <p>The traditional allocation argument says bonds reduce sequence risk. That is true, but incomplete. This spending rule already cuts discretionary spending before the portfolio is exhausted. Once that is true, the value of a permanent 10-year Treasury sleeve falls on the “years below start / median wealth” score this paper tracks.</p>
+          <blockquote>Under this flexible rule, extra permanent 10-year Treasuries buy a small cut in an already-small ruin rate and pay for it in years the real portfolio stays below its start.</blockquote>
+          <p>That is a scoped result, not a falsification of 60/40. The sample is US large-cap history from 1951 to 2025. Bonds here are 10-year Treasury total returns. Withdrawals are year-end after annual returns. A household that values floor certainty, a smaller left tail, or not sitting through a 50% equity drawdown can still prefer a bond sleeve. A TIPS-floor proxy and a halved equity premium are in Experiment 6; they are the cases most likely to change how much stock-only ‘lifestyle reliability’ is just the realized US premium.</p>
+        </section>
+
+        <section id="limits">
+          <h2>Limitations And Next Tests</h2>
+          <div class="grid-two">
+            <div class="note-card">
+              <h3>Important limitations</h3>
+              <ul>
+                <li>Taxes and fees are ignored.</li>
+                <li>Returns are annual, not monthly. Withdrawals happen after annual returns.</li>
+                <li>Bonds are 10-year Treasury total returns, not TIPS or a ladder.</li>
+                <li>Crash withdrawals sell bonds before equity; that is not pro-rata 60/40.</li>
+                <li>Overlapping 5-year blocks overweight interior years and replay the same crises.</li>
+                <li>No Social Security, pension, mortgage, or health shock modeling.</li>
+                <li>No international returns or haircut to the realized US equity premium.</li>
+              </ul>
+            </div>
+            <div class="note-card">
+              <h3>Follow-up tests</h3>
+              <ul>
+                <li>TIPS or short-Treasury floor funding, equities for surplus.</li>
+                <li>Pro-rata spending from a balanced fund.</li>
+                <li>Beginning-of-year and monthly withdrawals.</li>
+                <li>35- and 40-year longevity horizons.</li>
+                <li>Lower equity-premium / developed-ex-US samples.</li>
+                <li>Circular or non-overlapping blocks.</li>
+                <li>Social Security or a pension covering part of the floor.</li>
+              </ul>
+            </div>
+          </div>
+          <p>The result should be framed narrowly: under this specific flexible spending rule, with annual returns, sampled historical CPI inflation, and a permanent 10-year Treasury sleeve, extra defensive allocation did not improve the selected “years below start plus median wealth” score. Several items that used to be future work are now in Experiment 6: TIPS-floor proxy, pro-rata 60/40, beginning-of-year withdrawals, a 40-year horizon, a 50% equity-premium haircut, and circular blocks.</p>
+          <p>A sibling monthly report, <a href="credit-line.html">Can A Hybrid Credit Line Reduce Forced Selling?</a>, tests a cap-respecting credit line on S&amp;P 500 total-return data from 1988 onward. Those ruin and shortfall rates are not comparable to the annual tables above.</p>
+          <footer>Generated from <code>docs/assets/bond_report_results.json</code>, seed 20260513, 20,000 paths. Regenerating the HTML does not rerun the Monte Carlo.</footer>
+        </section>
+      </main>
+    </div>
   </div>
 </body>
 </html>

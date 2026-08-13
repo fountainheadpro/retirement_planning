@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-Source code lives at the repository root: `app.py` handles the Streamlit UI while `simulator.py` hosts market models, withdrawal rules, and data utilities. Keep notebooks (`retirement_analysis*.ipynb`) output-light and lean on `test_simulator.py` for executable checks. `pyproject.toml`/`uv.lock` define the reproducible environment, and only edit `requirements.md` when the methodology truly changes.
+Source code lives at the repository root: `app.py` handles the Streamlit UI, `simulator.py` hosts market models and the annual engine, `spending.py` is the shared target/cap/floor rule, and `metrics.py` is the shared ruin/shortfall summary. Keep notebooks (`retirement_analysis*.ipynb`) output-light and lean on `test_simulator.py` for executable checks. `pyproject.toml`/`uv.lock` define the reproducible environment, and only edit `requirements.md` when the methodology truly changes. Generated HTML in `docs/` must stay in sync with `docs/assets/*_results.json`.
 
 ## Build, Test, and Development Commands
 - `uv sync` — install the locked Python 3.12 toolchain defined in `pyproject.toml`/`uv.lock`.

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -14,6 +15,11 @@ from matplotlib import patches
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from metrics import ruin_ever, summarize_withdrawals
+from spending import apply_target_cap_floor
+
 DOCS_DIR = ROOT / "docs"
 ASSET_DIR = DOCS_DIR / "assets"
 REPORT_PATH = DOCS_DIR / "credit-line.html"
@@ -151,9 +157,12 @@ def spending_amount(wealth: np.ndarray, target_rate: float) -> np.ndarray:
     """Monthly target/cap/floor spending rule in real dollars."""
     target_monthly = target_rate / 12.0 * BASE
     floor_monthly = target_monthly * FLOOR_RATIO
-    cap = target_rate / 12.0 * np.maximum(wealth, 0.0)
-    desired = np.maximum(np.minimum(target_monthly, cap), floor_monthly)
-    return np.minimum(desired, np.maximum(wealth, 0.0))
+    return apply_target_cap_floor(
+        wealth,
+        target_monthly,
+        target_rate / 12.0,
+        floor_monthly,
+    )
 
 
 def run_sell_baseline(paths: dict[str, np.ndarray], target_rate: float) -> dict[str, np.ndarray]:
@@ -305,18 +314,15 @@ def summarize(
     target_monthly = target_rate / 12.0 * BASE
     floor_monthly = target_monthly * FLOOR_RATIO
     final = net_values[-1, :]
-    target_shortfall = spending < target_monthly - 1e-8
-    floor_breach = spending < floor_monthly - 1e-8
-    ruin_path = np.any(net_values <= 1e-8, axis=0)
-    affected_counts = target_shortfall.sum(axis=0)
-    affected_counts = affected_counts[affected_counts > 0]
-    shortfall_loss = np.maximum(target_monthly - spending, 0.0) / target_monthly
-
-    if np.any(target_shortfall):
-        avg_gap = float(np.mean(shortfall_loss[target_shortfall]) * 100)
-    else:
-        avg_gap = 0.0
-
+    common = summarize_withdrawals(
+        spending,
+        target_monthly,
+        floor_monthly,
+        final_wealth=final,
+        initial_wealth=BASE,
+        tolerance=1e-8,
+    )
+    ruin_path = ruin_ever(net_values)
     debt_months = debt[1:, :] > 1e-8
     debt_month_counts = debt_months.sum(axis=0)
     debt_month_counts = debt_month_counts[debt_month_counts > 0]
@@ -332,17 +338,17 @@ def summarize(
         ),
         "ruin_pct": float(np.mean(ruin_path) * 100),
         "ruin_count": int(np.sum(ruin_path)),
-        "target_shortfall_pct": float(np.mean(target_shortfall) * 100),
-        "target_shortfall_ever_pct": float(np.mean(np.any(target_shortfall, axis=0)) * 100),
-        "target_shortfall_median_months_if_any": (
-            float(np.median(affected_counts)) if len(affected_counts) else 0.0
-        ),
-        "floor_breach_pct": float(np.mean(floor_breach) * 100),
-        "floor_breach_ever_pct": float(np.mean(np.any(floor_breach, axis=0)) * 100),
-        "avg_shortfall_gap_pct": avg_gap,
-        "integrated_target_loss_pct": float(np.mean(shortfall_loss) * 100),
-        "final_p10_multiple": float(np.percentile(final, 10)),
-        "final_median_multiple": float(np.median(final)),
+        "target_shortfall_pct": common["target_shortfall_pct"],
+        "target_shortfall_ever_pct": common["target_shortfall_ever_pct"],
+        "target_shortfall_median_months_if_any": common[
+            "target_shortfall_median_years_if_any"
+        ],
+        "floor_breach_pct": common["floor_breach_pct"],
+        "floor_breach_ever_pct": common["floor_breach_ever_pct"],
+        "avg_shortfall_gap_pct": common["target_shortfall_avg_depth_pct_target"] * 100,
+        "integrated_target_loss_pct": common["target_shortfall_integrated_loss_pct_target"],
+        "final_p10_multiple": common["final_p10_multiple"],
+        "final_median_multiple": common["final_median_multiple"],
         "final_p90_multiple": float(np.percentile(final, 90)),
         "ever_credit_used_pct": float(np.mean(np.any(credit_used, axis=0)) * 100),
         "median_debt_months_if_any": (
@@ -816,7 +822,9 @@ def borrow_rule_comparison_table(
     return "\n".join(body)
 
 
-def write_report(results: dict) -> None:
+def write_report(results: dict | None = None) -> None:
+    if results is None:
+        results = json.loads(RESULTS_PATH.read_text())
     scenarios = results["scenarios"]
     target_protecting_scenarios = results["target_protecting_scenarios"]
     primary_rows = scenarios[0]["rows"]
@@ -833,9 +841,9 @@ def write_report(results: dict) -> None:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Can A Hybrid Credit Line Replace Cash And Bonds?</title>
+  <title>Can A Hybrid Credit Line Reduce Forced Selling?</title>
   <meta name="description" content="A monthly S&P 500 total-return simulation testing a cap-respecting asset-backed credit line as a retirement drawdown buffer.">
-  <meta property="og:title" content="Can A Hybrid Credit Line Replace Cash And Bonds?">
+  <meta property="og:title" content="Can A Hybrid Credit Line Reduce Forced Selling?">
   <meta property="og:description" content="A separate retirement report testing whether a smaller, cap-respecting credit line can reduce forced selling without overriding flexible spending.">
   <meta property="og:type" content="article">
   <meta property="og:image" content="assets/credit_line_objective_tradeoff.png">
@@ -912,9 +920,16 @@ def write_report(results: dict) -> None:
     .metric strong {{ display: block; font-family: "Source Serif 4", Georgia, serif; font-size: clamp(1.65rem, 3vw, 2.8rem); line-height: 1; margin-bottom: 8px; }}
     .metric span {{ color: var(--muted); font-size: 0.92rem; }}
     .layout {{ display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 44px; align-items: start; }}
-    nav {{ position: sticky; top: 18px; padding: 18px 0; border-top: 2px solid var(--ink); }}
-    nav a {{ display: block; padding: 8px 0; color: #344250; text-decoration: none; font-size: 0.95rem; border-bottom: 1px solid rgba(22, 33, 44, 0.1); }}
-    nav a:hover {{ color: var(--red); }}
+    .site-nav {{ border-bottom: 1px solid var(--line); background: rgba(251, 250, 245, 0.92); backdrop-filter: blur(12px); }}
+    .site-nav-inner {{ max-width: 1180px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }}
+    .site-nav-brand {{ color: var(--ink); font-weight: 600; text-decoration: none; letter-spacing: 0.02em; }}
+    .site-nav-links {{ display: flex; flex-wrap: wrap; gap: 8px 18px; }}
+    .site-nav a {{ color: #344250; text-decoration: none; font-size: 0.92rem; }}
+    .site-nav a:hover, .site-nav a[aria-current="page"] {{ color: var(--red); }}
+    .site-nav a[aria-current="page"] {{ font-weight: 600; }}
+    nav.toc {{ position: sticky; top: 18px; padding: 18px 0; border-top: 2px solid var(--ink); }}
+    nav.toc a {{ display: block; padding: 8px 0; color: #344250; text-decoration: none; font-size: 0.95rem; border-bottom: 1px solid rgba(22, 33, 44, 0.1); }}
+    nav.toc a:hover {{ color: var(--red); }}
     section {{ padding: 58px 0; border-top: 1px solid var(--line); }}
     section:first-child {{ border-top: 0; padding-top: 0; }}
     .lead {{ font-size: 1.17rem; color: #2e3c49; max-width: 860px; }}
@@ -936,7 +951,7 @@ def write_report(results: dict) -> None:
     @media (max-width: 920px) {{
       .hero, .layout, .grid-two {{ grid-template-columns: 1fr; }}
       .hero {{ min-height: auto; }}
-      nav {{ position: static; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 18px; }}
+      nav.toc {{ position: static; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 18px; }}
       .metric-strip {{ grid-template-columns: repeat(2, 1fr); }}
     }}
     @media (max-width: 560px) {{
@@ -944,16 +959,27 @@ def write_report(results: dict) -> None:
       .metric-strip {{ grid-template-columns: 1fr; }}
       .metric {{ border-right: 0; border-bottom: 1px solid var(--line); }}
       .metric:last-child {{ border-bottom: 0; }}
-      nav {{ grid-template-columns: 1fr; }}
+      nav.toc {{ grid-template-columns: 1fr; }}
+      .site-nav-inner {{ padding: 12px 16px; flex-direction: column; align-items: flex-start; }}
     }}
   </style>
 </head>
 <body>
+  <nav class="site-nav" aria-label="Site">
+    <div class="site-nav-inner">
+      <a class="site-nav-brand" href="index.html">Retirement Planning</a>
+      <div class="site-nav-links">
+        <a href="index.html">Allocation report</a>
+        <a href="credit-line.html" aria-current="page">Credit-line report</a>
+        <a href="https://github.com/actions-im/retirement_planning">GitHub</a>
+      </div>
+    </div>
+  </nav>
   <div class="page">
     <header class="hero">
       <div>
         <p class="eyebrow">Retirement Planning Report · May 16, 2026</p>
-        <h1>Can A Hybrid Credit Line Replace Cash And Bonds?</h1>
+        <h1>Can A Hybrid Credit Line Reduce Forced Selling?</h1>
         <p class="dek">A monthly S&amp;P 500 total-return simulation testing whether an asset-backed credit line can reduce forced selling during drawdowns while still letting discretionary spending flex down.</p>
       </div>
       <aside class="hero-panel">
@@ -970,7 +996,7 @@ def write_report(results: dict) -> None:
     </div>
 
     <div class="layout">
-      <nav>
+      <nav class="toc" aria-label="Report sections">
         <a href="#summary">Summary</a>
         <a href="#setup">Setup</a>
         <a href="#hybrid">Hybrid Rule</a>
@@ -991,7 +1017,7 @@ def write_report(results: dict) -> None:
 
         <section id="setup">
           <h2>Setup</h2>
-          <p>This report uses monthly data because credit-line triggers and paybacks are path-dependent. Annual data is too coarse for this specific question.</p>
+          <p>This report uses monthly data because credit-line triggers and paybacks are path-dependent. Annual data is too coarse for this specific question. It does not simulate a T-bill cash buffer or a 60/40 sleeve, so it cannot answer whether the line replaces cash or bonds. The 5% sell-only ruin here is also not the {1.21:.2f}% figure from the annual allocation report: the data window starts in 1988, the steps are monthly, and ruin is an ever-hit-zero rate rather than terminal wealth.</p>
           <div class="grid-two">
             <div class="note-card">
               <h3>Data</h3>
@@ -1086,6 +1112,7 @@ if drawdown trigger is active:
           </ul>
           <footer>
             Data sources: Yahoo/yfinance <code>^SP500TR</code> and FRED <code>CPIAUCSL</code>.
+            The sibling annual report, <a href="index.html">The Measurable Tradeoffs Behind The 4% Rule</a>, uses Damodaran 1951–2025 stock/bond/T-bill blocks and is not numerically comparable to these monthly paths.
           </footer>
         </section>
       </main>
@@ -1137,8 +1164,11 @@ def main() -> None:
     plot_mechanics()
     plot_tradeoff(scenarios)
     plot_objective(scenarios)
-    write_report(results)
+    write_report()
 
 
 if __name__ == "__main__":
-    main()
+    if "--render-only" in sys.argv:
+        write_report()
+    else:
+        main()

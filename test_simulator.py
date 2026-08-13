@@ -93,8 +93,6 @@ class TestRunSimulation:
     
     def test_reproducibility_with_seed(self, mock_residuals):
         """Same seed should produce same results."""
-        # Set numpy seed for reproducibility
-        np.random.seed(123)
         model1 = RandomWalkMarket(mu=0.08, residuals=mock_residuals)
         results1 = run_simulation(
             initial_net_worth=1_000_000,
@@ -104,11 +102,9 @@ class TestRunSimulation:
             panic_threshold=-0.15,
             inflation_rate=0.03,
             n_paths=50,
-            market_model=model1
+            market_model=model1,
+            random_seed=123,
         )
-        portfolio1 = results1['portfolio_values']
-
-        np.random.seed(123)
         model2 = RandomWalkMarket(mu=0.08, residuals=mock_residuals)
         results2 = run_simulation(
             initial_net_worth=1_000_000,
@@ -118,11 +114,12 @@ class TestRunSimulation:
             panic_threshold=-0.15,
             inflation_rate=0.03,
             n_paths=50,
-            market_model=model2
+            market_model=model2,
+            random_seed=123,
         )
-        portfolio2 = results2['portfolio_values']
-
-        np.testing.assert_array_equal(portfolio1, portfolio2)
+        np.testing.assert_array_equal(
+            results1["portfolio_values"], results2["portfolio_values"]
+        )
     
     def test_high_spend_causes_depletion(self, mock_residuals):
         """Excessive spending should deplete portfolio."""
@@ -319,6 +316,39 @@ class TestRunSimulation:
 
         assert results["withdrawals_from_bonds"][0, 0] == 100_000
         assert results["withdrawals_from_equity"][0, 0] == 0
+
+    def test_bond_sleeve_invokes_strategy_hooks(self):
+        """A bond allocation should go through CashStrategy, not an inline fork."""
+        from strategies import ConservativeStrategy
+
+        class SpyStrategy(ConservativeStrategy):
+            def __init__(self):
+                self.withdraw_calls = 0
+
+            def determine_withdrawal_source(self, ctx):
+                self.withdraw_calls += 1
+                return super().determine_withdrawal_source(ctx)
+
+        spy = SpyStrategy()
+        model = PairedBlockBootstrapMarket(
+            stock_returns=np.array([-0.20]),
+            bond_returns=np.array([0.0]),
+            block_size=1,
+        )
+        run_simulation(
+            initial_net_worth=1_000_000,
+            annual_spend=100_000,
+            buffer_years=0,
+            years=1,
+            panic_threshold=-0.15,
+            inflation_rate=0.0,
+            n_paths=1,
+            market_model=model,
+            spending_cap_pct=1.0,
+            bond_allocation_pct=0.20,
+            strategy=spy,
+        )
+        assert spy.withdraw_calls == 1
 
     def test_sampled_inflation_deflates_nominal_returns(self):
         """Historical inflation matrix should deflate nominal returns year by year."""

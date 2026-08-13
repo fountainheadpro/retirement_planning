@@ -2,6 +2,7 @@ import streamlit as st
 import plotly.graph_objects as go
 import numpy as np
 
+from metrics import summarize_withdrawals
 from simulator import (
     get_sp500_residuals,
     get_stock_bond_data,
@@ -52,22 +53,61 @@ st.markdown(
 )
 st.caption("All monetary values are displayed in Today's Dollars (Real Purchasing Power).")
 st.markdown("""
-This tool uses statistical models to simulate future market behavior,
-ensuring fat-tail events (2000, 2008) are represented in risk projections.
+This tool uses statistical models to simulate future market behavior.
+Block bootstrap preserves historical crash sequences (2000, 2008). Random Walk
+and AR models do not: AR innovations are Gaussian.
 """)
 
 with st.expander("📚 Published Research & Methodology", expanded=False):
     st.markdown("""
-    The models and spending rules here power the detailed sequence-risk research reports:
-    
-    - **[Hybrid Credit Line Report](docs/credit-line.html)** — Can a securities-backed credit line (respecting the spending cap) meaningfully replace cash buffers or bonds? Monthly simulation, explicit debt dynamics, and pragmatic conclusions.
-    - **Stock/Bond Allocation & 4% Rule Tradeoffs** — See `notes/stock_bond_allocation_report_2026-05-13.md` (block bootstrap, 20k paths, target vs floor vs ruin metrics).
-    
-    **Reproducibility tip**: Enable "Fixed random seed" in Simulation Parameters to get bit-identical results for any published scenario.
+    The models and spending rules here power the published sequence-risk reports:
+
+    - **[The Measurable Tradeoffs Behind The 4% Rule](docs/index.html)** — Annual Damodaran stock/bond/T-bill blocks with FRED CPI, 20,000 paths. This app uses the same engine and spending rule.
+    - **[Hybrid Credit Line Report](docs/credit-line.html)** — Monthly S&P 500 total-return simulation of a cap-respecting credit line. Different data window and engine; numbers are not comparable to the annual report.
+
+    **Reproducibility tip**: Enable "Fixed random seed" in Simulation Parameters to get bit-identical annual paths. The published allocation tables use seed `20260513` and 20,000 paths.
     """)
 
 # Sidebar Configuration
 st.sidebar.header("⚙️ Configuration")
+
+PRESETS = {
+    "Custom": None,
+    "Reproduce 4% stock-only (seed 20260513)": {
+        "model": "Stock/Bond Block Bootstrap",
+        "strategy": "Fully Invested (No Cash Buffer)",
+        "spending_cap_pct": 4.0,
+        "bond_allocation_pct": 0,
+        "history_years": 75,
+        "block_size": 5,
+        "years": 30,
+        "n_paths": 20000,
+        "seed": 20260513,
+    },
+    "Reproduce 4% 60/40 (seed 20260513)": {
+        "model": "Stock/Bond Block Bootstrap",
+        "strategy": "Conservative (Protect Withdrawals)",
+        "spending_cap_pct": 4.0,
+        "bond_allocation_pct": 40,
+        "buffer_years": 0,
+        "history_years": 75,
+        "block_size": 5,
+        "years": 30,
+        "n_paths": 20000,
+        "seed": 20260513,
+    },
+}
+
+preset_name = st.sidebar.selectbox(
+    "Scenario preset",
+    options=list(PRESETS.keys()),
+    help="Presets match the published allocation-report setup. 20,000 paths is slow.",
+)
+preset = PRESETS[preset_name]
+if preset:
+    st.sidebar.info(
+        "Preset values override the controls below so you can reproduce a published table setup."
+    )
 
 # 1. Run Button (Top Level)
 run_sim = st.sidebar.button("🚀 Run Simulation", type="primary")
@@ -84,10 +124,11 @@ with st.sidebar.expander("📊 Market Model", expanded=True):
         "Block Bootstrap",
         "Stock/Bond Block Bootstrap",
     ]
+    default_model = preset["model"] if preset else "Stock/Bond Block Bootstrap"
     selected_model = st.selectbox(
         "Market Model",
         options=model_options,
-        index=model_options.index("Stock/Bond Block Bootstrap"), # Default to paired stock/bond model
+        index=model_options.index(default_model),
         help="""
 Select the statistical model for simulating market returns:
 
@@ -103,26 +144,34 @@ Select the statistical model for simulating market returns:
     
     block_size = 5 # Default value
     if selected_model in ["Block Bootstrap", "Stock/Bond Block Bootstrap"]:
-        block_size = st.slider("Block Size (Years)", 1, 10, 5, help="Length of historical blocks to resample. Preserves historical correlations.")
+        block_size = st.slider(
+            "Block Size (Years)",
+            1,
+            10,
+            preset["block_size"] if preset else 5,
+            help="Length of historical blocks to resample. Preserves historical correlations.",
+        )
         
     history_years = st.slider(
         "Historical Data (Years)",
         min_value=20,
         max_value=100,
-        value=75,
+        value=preset["history_years"] if preset else 75,
         help="Look-back window for calibration. Affects all models."
     )
 
 # 3. Portfolio & Strategy Settings
 with st.sidebar.expander("💰 Portfolio & Strategy", expanded=True):
+    strategy_options = [
+        "Conservative (Protect Withdrawals)",
+        "Aggressive (Buy the Dip)",
+        "Fully Invested (No Cash Buffer)",
+    ]
+    default_strategy = preset["strategy"] if preset else "Fully Invested (No Cash Buffer)"
     strategy_display = st.selectbox(
         "Cash Strategy",
-        options=[
-            "Conservative (Protect Withdrawals)", 
-            "Aggressive (Buy the Dip)", 
-            "Fully Invested (No Cash Buffer)"
-        ],
-        index=2,
+        options=strategy_options,
+        index=strategy_options.index(default_strategy),
         help="""
 **Conservative:** Uses cash buffer to fund withdrawals during market downturns (Panic/Drawdown) to avoid selling equity at a loss. Replenishes cash only when market recovers (High Water Mark).
 
@@ -153,7 +202,7 @@ with st.sidebar.expander("💰 Portfolio & Strategy", expanded=True):
         "Spending Cap (% of Portfolio)",
         min_value=1.0,
         max_value=10.0,
-        value=5.0,
+        value=float(preset["spending_cap_pct"]) if preset else 5.0,
         step=0.5,
         help="Maximum annual withdrawal as a percentage of current portfolio value. The starting target is derived from this cap and initial net worth."
     ) / 100
@@ -187,7 +236,7 @@ with st.sidebar.expander("💰 Portfolio & Strategy", expanded=True):
             "Cash Buffer (Years)",
             min_value=0,
             max_value=5,
-            value=2,
+            value=int(preset["buffer_years"]) if preset and "buffer_years" in preset else 2,
             help="Years of expenses to keep in cash buffer"
         )
         
@@ -210,15 +259,18 @@ with st.sidebar.expander("💰 Portfolio & Strategy", expanded=True):
         buffer_years = 0
         cash_interest_rate = 0.0
 
-    if selected_model == "Stock/Bond Block Bootstrap":
+    if selected_model == "Stock/Bond Block Bootstrap" and selected_strategy == "Conservative":
         bond_allocation_pct = st.slider(
             "Bond Allocation (% of Non-Cash Portfolio)",
             min_value=0,
             max_value=80,
-            value=0,
+            value=int(preset["bond_allocation_pct"]) if preset else 0,
             step=5,
-            help="Percent of the non-cash portfolio held in 10-year Treasury bond total returns."
+            help="Percent of the non-cash portfolio held in 10-year Treasury bond total returns. Bond sleeves use the conservative sourcing rule.",
         ) / 100
+    elif selected_model == "Stock/Bond Block Bootstrap":
+        bond_allocation_pct = 0.0
+        st.caption("Bond sleeve uses the conservative sourcing rule. Choose Conservative to set a 10-year Treasury allocation.")
     else:
         bond_allocation_pct = 0.0
 
@@ -228,7 +280,7 @@ with st.sidebar.expander("🎲 Simulation Parameters", expanded=True):
         "Simulation Duration (Years)",
         min_value=10,
         max_value=50,
-        value=30
+        value=int(preset["years"]) if preset else 30,
     )
 
     panic_threshold = st.slider(
@@ -250,13 +302,15 @@ with st.sidebar.expander("🎲 Simulation Parameters", expanded=True):
 
     n_paths = st.select_slider(
         "Monte Carlo Paths",
-        options=[500, 1000, 2000, 5000, 10000],
-        value=5000
+        options=[500, 1000, 2000, 5000, 10000, 20000],
+        value=int(preset["n_paths"]) if preset else 5000,
     )
+    if n_paths >= 20000:
+        st.caption("20,000 paths matches the published reports and is slow.")
 
     use_fixed_seed = st.checkbox(
         "Fixed random seed (reproducible runs)",
-        value=False,
+        value=bool(preset),
         help="Enable this and set a seed below to get identical results on every run. Useful for sharing specific scenarios or publishing exact report numbers."
     )
     random_seed = None
@@ -265,7 +319,7 @@ with st.sidebar.expander("🎲 Simulation Parameters", expanded=True):
             "Random Seed",
             min_value=0,
             max_value=2**31 - 1,
-            value=42,
+            value=int(preset["seed"]) if preset else 42,
             step=1,
             help="Integer seed for the numpy RNG. Same seed + same parameters = identical paths."
         )
@@ -307,12 +361,19 @@ if run_sim or 'results' not in st.session_state:
                 model_info_msg = f"Random Walk (Mean: {mu:.1%}, Std Dev of Residuals: {np.std(residuals):.1%})"
                 
             elif selected_model == "Block Bootstrap":
-                mu, residuals, history = fetch_market_data(history_years)
-                if history is None:
-                    st.error("Failed to load S&P 500 market data.")
-                    st.stop()
-                market_model = BlockBootstrapMarket(history, block_size=block_size)
-                model_info_msg = f"Block Bootstrap (Block Size: {block_size}y, History: {len(history)}y)"
+                asset_history = fetch_stock_bond_data(history_years)
+                market_model = BlockBootstrapMarket(
+                    asset_history["stock_returns"],
+                    block_size=block_size,
+                    inflation_rates=asset_history["inflation_rates"],
+                    cash_returns=asset_history["tbill_returns"],
+                )
+                model_info_msg = (
+                    f"Block Bootstrap (Block Size: {block_size}y, "
+                    f"History: {len(asset_history['years'])}y, "
+                    f"sampled CPI and T-bills, "
+                    f"{asset_history['years'][0]}-{asset_history['years'][-1]})"
+                )
 
             elif selected_model == "Stock/Bond Block Bootstrap":
                 asset_history = fetch_stock_bond_data(history_years)
@@ -453,33 +514,37 @@ if 'results' in st.session_state:
             help=f"Portfolio value in the {ordinal((1-params['confidence'])/2*100)} percentile (bad outcome) scenario."
         )
     
+    outcome = summarize_withdrawals(
+        results['withdrawal_vals'],
+        params['annual_spend'],
+        minimum_annual_spend_param,
+        final_wealth=results['portfolio_vals'][-1, :],
+        initial_wealth=params['initial_net_worth'],
+    )
+
     with col3:
-        ruin_prob = np.mean(results['portfolio_vals'][-1, :] <= 0) * 100
         st.metric(
-            "Ruin Probability", 
-            f"{ruin_prob:.1f}%",
-            help="Probability of running out of money before the end of the simulation."
+            "Ruin Rate",
+            f"{outcome['ruin_pct']:.1f}%",
+            help="Share of simulated paths whose terminal wealth is at or below zero."
         )
     
     with col4:
-        withdrawal_shortfall = np.mean(results['withdrawal_vals'] < params['annual_spend']) * 100
         st.metric(
-            "Target Shortfall Risk",
-            f"{withdrawal_shortfall:.1f}%",
-            help="Probability of having to reduce spending below your target."
+            "Target Shortfall",
+            f"{outcome['target_shortfall_pct']:.1f}%",
+            help="Share of simulated path-years with withdrawal below target. When the target rate equals the cap rate, that is also the share of years real wealth is below start."
         )
 
     with col5:
-        if minimum_annual_spend_param > 0:
-            floor_breach = np.mean(results['withdrawal_vals'] < minimum_annual_spend_param) * 100
-            floor_help = "Probability of having to reduce spending below your minimum floor."
-        else:
-            floor_breach = 0.0
-            floor_help = "Set a minimum spending floor to track floor breach risk."
-
+        floor_help = (
+            "Share of simulated path-years with withdrawal below the minimum floor."
+            if minimum_annual_spend_param > 0
+            else "Set a minimum spending floor to track floor breach risk."
+        )
         st.metric(
-            "Floor Breach Risk",
-            f"{floor_breach:.1f}%",
+            "Floor Breach",
+            f"{outcome['floor_breach_pct']:.1f}%",
             help=floor_help
         )
     

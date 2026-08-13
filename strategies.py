@@ -7,6 +7,7 @@ class StrategyContext:
     """Context object passed to strategy methods containing current simulation state."""
     current_cash: np.ndarray
     current_equity: np.ndarray
+    current_bonds: np.ndarray
     panic_mask: np.ndarray
     desired_withdrawal: np.ndarray
     # Market context
@@ -14,6 +15,30 @@ class StrategyContext:
     market_peak: np.ndarray
     # Configuration
     target_cash_level: float  # For replenishment targets
+    bond_allocation_pct: float = 0.0
+
+def apply_cash_equity_transfer(
+    cash: np.ndarray,
+    equity: np.ndarray,
+    transfer: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Apply a signed equity<->cash transfer, capped by available balances.
+
+    Positive transfer moves equity to cash. Negative moves cash to equity.
+    Returns the updated cash, equity, and realized transfer.
+    """
+    realized = np.zeros_like(transfer)
+    to_equity = transfer < 0
+    to_cash = transfer > 0
+    if np.any(to_equity):
+        amount = np.minimum(-transfer[to_equity], cash[to_equity])
+        realized[to_equity] = -amount
+    if np.any(to_cash):
+        amount = np.minimum(transfer[to_cash], equity[to_cash])
+        realized[to_cash] = amount
+    cash = cash + realized
+    equity = equity - realized
+    return cash, equity, realized
 
 class CashStrategy(ABC):
     """Abstract base class for cash management strategies."""
@@ -32,13 +57,10 @@ class CashStrategy(ABC):
         pass
 
     @abstractmethod
-    def determine_withdrawal_source(self, ctx: StrategyContext) -> tuple[np.ndarray, np.ndarray]:
-        """
-        Determines how to split the desired withdrawal between Cash and Equity.
-        
-        Returns:
-            tuple[np.ndarray, np.ndarray]: (amount_from_cash, amount_from_equity)
-        """
+    def determine_withdrawal_source(
+        self, ctx: StrategyContext
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Split the desired withdrawal across cash, bonds, and equity."""
         pass
 
     @abstractmethod
@@ -51,6 +73,16 @@ class CashStrategy(ABC):
         """
         pass
 
+    def post_withdrawal_bond_transfer(self, ctx: StrategyContext) -> np.ndarray:
+        """Amount to move from bonds to cash after the equity replenishment step."""
+        return np.zeros_like(ctx.current_cash)
+
+    def rebalance_invested_assets(
+        self, ctx: StrategyContext
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Return (equity, bonds) after any target-allocation rebalance."""
+        return ctx.current_equity, ctx.current_bonds
+
 
 class ConservativeStrategy(CashStrategy):
     """
@@ -62,42 +94,98 @@ class ConservativeStrategy(CashStrategy):
         # No action before withdrawal
         return np.zeros_like(ctx.current_cash)
 
-    def determine_withdrawal_source(self, ctx: StrategyContext) -> tuple[np.ndarray, np.ndarray]:
+    def determine_withdrawal_source(
+        self, ctx: StrategyContext
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         n_paths = len(ctx.current_cash)
+        remaining = ctx.desired_withdrawal.copy()
         from_cash = np.zeros(n_paths)
+        from_bonds = np.zeros(n_paths)
         from_equity = np.zeros(n_paths)
-        
-        has_cash = ctx.current_cash > 0
-        # Panic & Has Cash -> Use Cash First
-        use_cash_mask = ctx.panic_mask & has_cash
-        
-        # 1. Panic Case
-        if np.any(use_cash_mask):
-            from_cash[use_cash_mask] = np.minimum(ctx.desired_withdrawal[use_cash_mask], ctx.current_cash[use_cash_mask])
-            from_equity[use_cash_mask] = ctx.desired_withdrawal[use_cash_mask] - from_cash[use_cash_mask]
-            
-        # 2. Normal Case (or Cash Depleted)
-        use_equity_mask = ~use_cash_mask
-        if np.any(use_equity_mask):
-            from_equity[use_equity_mask] = np.minimum(ctx.desired_withdrawal[use_equity_mask], ctx.current_equity[use_equity_mask])
-            from_cash[use_equity_mask] = ctx.desired_withdrawal[use_equity_mask] - from_equity[use_equity_mask]
-            
-        return from_cash, from_equity
+
+        panic_with_cash = ctx.panic_mask & (ctx.current_cash > 0)
+        if np.any(panic_with_cash):
+            from_cash[panic_with_cash] = np.minimum(
+                remaining[panic_with_cash],
+                ctx.current_cash[panic_with_cash],
+            )
+            remaining -= from_cash
+
+        panic_with_bonds = ctx.panic_mask & (remaining > 0)
+        if np.any(panic_with_bonds):
+            from_bonds[panic_with_bonds] = np.minimum(
+                remaining[panic_with_bonds],
+                ctx.current_bonds[panic_with_bonds],
+            )
+            remaining -= from_bonds
+
+        use_equity = remaining > 0
+        if np.any(use_equity):
+            from_equity[use_equity] = np.minimum(
+                remaining[use_equity],
+                ctx.current_equity[use_equity],
+            )
+            remaining -= from_equity
+
+        use_bonds_normal = (~ctx.panic_mask) & (remaining > 0)
+        if np.any(use_bonds_normal):
+            take = np.minimum(
+                remaining[use_bonds_normal],
+                ctx.current_bonds[use_bonds_normal],
+            )
+            from_bonds[use_bonds_normal] += take
+            remaining[use_bonds_normal] -= take
+
+        use_cash_normal = (~ctx.panic_mask) & (remaining > 0)
+        if np.any(use_cash_normal):
+            from_cash[use_cash_normal] += np.minimum(
+                remaining[use_cash_normal],
+                ctx.current_cash[use_cash_normal],
+            )
+
+        return from_cash, from_bonds, from_equity
 
     def post_withdrawal_rebalance(self, ctx: StrategyContext) -> np.ndarray:
-        # Replenish Logic
-        # Rule: Only replenish if we are at or above the Market High Water Mark
         n_paths = len(ctx.current_cash)
         transfers = np.zeros(n_paths)
-        
         at_peak = ctx.market_index >= (ctx.market_peak * 0.999)
         replenish_mask = at_peak & (ctx.current_cash < ctx.target_cash_level)
-        
         if np.any(replenish_mask):
             shortfall = ctx.target_cash_level - ctx.current_cash[replenish_mask]
             transfers[replenish_mask] = np.minimum(shortfall, ctx.current_equity[replenish_mask])
-            
         return transfers
+
+    def post_withdrawal_bond_transfer(self, ctx: StrategyContext) -> np.ndarray:
+        n_paths = len(ctx.current_cash)
+        transfers = np.zeros(n_paths)
+        at_peak = ctx.market_index >= (ctx.market_peak * 0.999)
+        replenish_mask = at_peak & (ctx.current_cash < ctx.target_cash_level)
+        if np.any(replenish_mask):
+            shortfall = ctx.target_cash_level - ctx.current_cash[replenish_mask]
+            transfers[replenish_mask] = np.minimum(shortfall, ctx.current_bonds[replenish_mask])
+        return transfers
+
+    def rebalance_invested_assets(
+        self, ctx: StrategyContext
+    ) -> tuple[np.ndarray, np.ndarray]:
+        if ctx.bond_allocation_pct <= 0.0:
+            return ctx.current_equity, ctx.current_bonds
+        equity = ctx.current_equity.copy()
+        bonds = ctx.current_bonds.copy()
+        invested = equity + bonds
+        target_bonds = invested * ctx.bond_allocation_pct
+        bond_shortfall = target_bonds - bonds
+        buy = bond_shortfall > 0
+        if np.any(buy):
+            transfer = np.minimum(bond_shortfall[buy], equity[buy])
+            bonds[buy] += transfer
+            equity[buy] -= transfer
+        sell = bond_shortfall < 0
+        if np.any(sell):
+            transfer = np.minimum(-bond_shortfall[sell], bonds[sell])
+            bonds[sell] -= transfer
+            equity[sell] += transfer
+        return equity, bonds
 
 
 class AggressiveStrategy(CashStrategy):
@@ -120,17 +208,15 @@ class AggressiveStrategy(CashStrategy):
             
         return transfers
 
-    def determine_withdrawal_source(self, ctx: StrategyContext) -> tuple[np.ndarray, np.ndarray]:
-        # Always prioritize Equity First
-        # (If we just bought the dip, cash is 0 anyway)
-        n_paths = len(ctx.current_cash)
-        from_cash = np.zeros(n_paths)
-        from_equity = np.zeros(n_paths)
-        
+    def determine_withdrawal_source(
+        self, ctx: StrategyContext
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         from_equity = np.minimum(ctx.desired_withdrawal, ctx.current_equity)
-        from_cash = ctx.desired_withdrawal - from_equity # Remainder from cash
-        
-        return from_cash, from_equity
+        remaining = ctx.desired_withdrawal - from_equity
+        from_cash = np.minimum(remaining, ctx.current_cash)
+        remaining = remaining - from_cash
+        from_bonds = np.minimum(remaining, ctx.current_bonds)
+        return from_cash, from_bonds, from_equity
 
     def post_withdrawal_rebalance(self, ctx: StrategyContext) -> np.ndarray:
         # Identical replenishment logic to Conservative
@@ -157,16 +243,39 @@ class NoCashBufferStrategy(CashStrategy):
     def pre_withdrawal_rebalance(self, ctx: StrategyContext) -> np.ndarray:
         return np.zeros_like(ctx.current_cash)
 
-    def determine_withdrawal_source(self, ctx: StrategyContext) -> tuple[np.ndarray, np.ndarray]:
-        n_paths = len(ctx.current_cash)
-        from_cash = np.zeros(n_paths)
-        from_equity = np.zeros(n_paths)
-        
-        # Equity First
+    def determine_withdrawal_source(
+        self, ctx: StrategyContext
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         from_equity = np.minimum(ctx.desired_withdrawal, ctx.current_equity)
-        from_cash = ctx.desired_withdrawal - from_equity
-        
-        return from_cash, from_equity
+        remaining = ctx.desired_withdrawal - from_equity
+        from_cash = np.minimum(remaining, ctx.current_cash)
+        remaining = remaining - from_cash
+        from_bonds = np.minimum(remaining, ctx.current_bonds)
+        return from_cash, from_bonds, from_equity
 
     def post_withdrawal_rebalance(self, ctx: StrategyContext) -> np.ndarray:
         return np.zeros_like(ctx.current_cash)
+
+
+class ProRataBondStrategy(ConservativeStrategy):
+    """Spend invested assets pro-rata, then cash. Rebalance like Conservative."""
+
+    def determine_withdrawal_source(
+        self, ctx: StrategyContext
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        n_paths = len(ctx.current_cash)
+        remaining = ctx.desired_withdrawal.copy()
+        from_cash = np.zeros(n_paths)
+        invested = ctx.current_equity + ctx.current_bonds
+        invest_take = np.minimum(remaining, invested)
+        equity_share = np.divide(
+            ctx.current_equity,
+            invested,
+            out=np.zeros(n_paths),
+            where=invested > 0,
+        )
+        from_equity = np.minimum(invest_take * equity_share, ctx.current_equity)
+        from_bonds = np.minimum(invest_take - from_equity, ctx.current_bonds)
+        remaining = remaining - from_equity - from_bonds
+        from_cash = np.minimum(remaining, ctx.current_cash)
+        return from_cash, from_bonds, from_equity

@@ -34,9 +34,21 @@ Follow the rules in [AGENTS.md](AGENTS.md):
 
 ## Research & Reports
 
-The published reports in `docs/` and `notes/` (especially the credit-line and stock/bond allocation analyses) are a core deliverable. Changes that would alter the numbers in those reports require strong justification and updated report text + regenerated assets.
+The published reports in `docs/` are a core deliverable:
 
-If you improve the cash buffer, spending rule, or credit line logic, please also update or extend the corresponding report generator so the published findings stay in sync.
+- `docs/index.html` — allocation / 4% report (annual engine).
+- `docs/credit-line.html` — credit-line report (monthly engine).
+
+Changes that would alter the numbers in those reports require updated report text **and** regenerated assets. After changing `simulator.py`, spending rules, cash/bond logic, or a report generator:
+
+```bash
+uv run python notes/generate_report_results.py
+uv run python notes/generate_report_assets.py
+uv run python notes/generate_report_html.py
+uv run python notes/generate_credit_line_report.py --render-only
+```
+
+Do not run the 20,000-path generators in CI. `pages.yml` only deploys the static `docs/` folder.
 
 ## Questions?
 
